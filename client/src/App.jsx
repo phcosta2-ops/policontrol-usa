@@ -1990,17 +1990,15 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
   const printFrameRef = useRef(null);
   const handlePrint = () => {
     const W = labelSize.w, H = labelSize.h;
-    const DPI = 96;
-    const Wpx = Math.round(W * DPI), Hpx = Math.round(H * DPI);
     const bgImg = tpl?.imageData && !tpl.isPdf ? tpl.imageData : null;
+    if (!bgImg) return;
     const ov = overlayFields.map(f => {
       const val = f.id==="lot" ? (lotText?"LOT: "+lotText:"") : (expText?"EXP: "+expText:"");
       if(!val) return "";
       return `<div style="position:absolute;left:${f.x}%;top:${f.y}%;transform:translate(-50%,-50%);font-size:${f.fontSize}pt;font-weight:${f.fontWeight};color:${f.color};white-space:nowrap;">${val}</div>`;
     }).join("");
 
-    // Use CSS background-image instead of <img> — much more reliable for printing base64
-    const bgStyle = bgImg ? `background-image:url(${bgImg});background-size:100% 100%;background-repeat:no-repeat;` : "";
+    const labelHtml = `<div class="label"><img src="${bgImg}" />${ov}</div>`;
 
     const html = `<!DOCTYPE html><html><head>
 <style>
@@ -2008,27 +2006,46 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
   @media print {
     @page { size: ${W}in ${H}in; margin: 0; }
     html, body { margin:0; padding:0; }
-    .label { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    #toolbar { display:none !important; }
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { width:${Wpx}px; }
-  .label {
-    width:${Wpx}px; height:${Hpx}px; position:relative; page-break-after:always; overflow:hidden;
-    ${bgStyle}
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
-  }
+  body { font-family:Arial,sans-serif; background:#f5f5f5; }
+  #toolbar { background:#0057a8; color:white; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; }
+  #toolbar button { background:white; color:#0057a8; border:none; padding:10px 24px; border-radius:6px; font-size:16px; font-weight:bold; cursor:pointer; }
+  #toolbar button:disabled { opacity:0.5; cursor:wait; }
+  .labels { display:flex; flex-wrap:wrap; gap:16px; padding:20px; justify-content:center; }
+  .label { width:${W}in; height:${H}in; position:relative; overflow:hidden; page-break-after:always; box-shadow:0 2px 8px rgba(0,0,0,0.15); }
+  .label img { width:100%; height:100%; object-fit:fill; display:block; }
 </style>
 </head><body>
-${Array(qty).fill(0).map(()=> `<div class="label">${ov}</div>`).join("\n")}
+<div id="toolbar">
+  <span>Policontrol Label — ${W}" x ${H}" — ${qty} label(s)</span>
+  <button id="printBtn" disabled onclick="window.print()">Loading...</button>
+</div>
+<div class="labels">
+${Array(qty).fill(labelHtml).join("\n")}
+</div>
 <script>
-  // Small delay then print
-  setTimeout(function() { window.print(); }, 300);
+var imgs = document.querySelectorAll('.label img');
+var loaded = 0;
+function onLoad() {
+  loaded++;
+  if (loaded >= imgs.length) {
+    document.getElementById('printBtn').disabled = false;
+    document.getElementById('printBtn').textContent = 'PRINT (Ctrl+P)';
+  }
+}
+for (var i = 0; i < imgs.length; i++) {
+  if (imgs[i].complete) onLoad();
+  else { imgs[i].onload = onLoad; imgs[i].onerror = onLoad; }
+}
+if (imgs.length === 0) onLoad();
 </script>
 </body></html>`;
 
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
-    const win = window.open(url, "_blank", `width=${Wpx+50},height=${Hpx+100}`);
+    const win = window.open(url, "_blank");
     if (!win) {
       const a = document.createElement("a");
       a.href = url; a.download = `label_${p.brand}_${lotText||"batch"}_${size}.html`; a.click();
