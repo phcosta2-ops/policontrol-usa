@@ -491,15 +491,15 @@ function PhotoBox({ images=[], onChange, canEdit=true }) {
 
 /* ══════════ MAIN APP ══════════ */
 export default function App() {
-  const [authState, setAuthState] = useState(getToken() ? "checking" : "login");
+  const [as, setAs] = useState(getToken() ? "checking" : "login");
   const [user, setUser] = useState(null);
   const [lf, setLf] = useState({ username: "", password: "" });
   const [le, setLe] = useState("");
-  useEffect(() => { if (authState==="checking") getMe().then(r=>{setUser(r.user);setAuthState("ok")}).catch(()=>{setToken("");setAuthState("login")}); }, [authState]);
-  const doLogin = async () => { setLe(""); try { const u = await apiLogin(lf.username, lf.password); setUser(u); setAuthState("ok"); } catch(e) { setLe(e.message||"Invalid credentials"); } };
-  const doLogout = async () => { await apiLogout(); setUser(null); setAuthState("login"); };
-  if (authState==="login") return (<div style={{minHeight:"100vh",background:K.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:K.cd,borderRadius:16,padding:40,width:360,boxShadow:"0 4px 24px rgba(0,0,0,0.08)",border:`1px solid ${K.bd}`}}><div style={{textAlign:"center",marginBottom:28}}><PolicontrolLogo size={56}/><h1 style={{fontSize:22,fontWeight:700,color:K.pri,margin:"12px 0 4px"}}>POLICONTROL USA</h1><p style={{fontSize:13,color:K.txM,margin:0}}>Manufacturing ERP</p></div>{le&&<div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#991b1b",marginBottom:12}}>{le}</div>}<div style={{marginBottom:12}}><label style={sl_}>Username</label><input value={lf.username} onChange={e=>setLf({...lf,username:e.target.value})} onKeyDown={e=>e.key==="Enter"&&doLogin()} style={{...si_,width:"100%",boxSizing:"border-box"}} autoFocus/></div><div style={{marginBottom:20}}><label style={sl_}>Password</label><input type="password" value={lf.password} onChange={e=>setLf({...lf,password:e.target.value})} onKeyDown={e=>e.key==="Enter"&&doLogin()} style={{...si_,width:"100%",boxSizing:"border-box"}}/></div><button onClick={doLogin} style={{...sb_,width:"100%",padding:"12px",fontSize:15}}>Sign In</button></div></div>);
-  if (authState==="checking"||!user) return (<div style={{minHeight:"100vh",background:K.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><PolicontrolLogo size={64}/></div>);
+  useEffect(() => { if (as==="checking") getMe().then(r=>{setUser(r.user);setAs("ok")}).catch(()=>{setToken("");setAs("login")}); }, [as]);
+  const doLogin = async () => { setLe(""); try { const u = await apiLogin(lf.username, lf.password); setUser(u); setAs("ok"); } catch(e) { setLe(e.message||"Invalid credentials"); } };
+  const doLogout = async () => { await apiLogout(); setUser(null); setAs("login"); };
+  if (as==="login") return (<div style={{minHeight:"100vh",background:K.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:K.cd,borderRadius:16,padding:40,width:360,boxShadow:"0 4px 24px rgba(0,0,0,0.08)",border:`1px solid ${K.bd}`}}><div style={{textAlign:"center",marginBottom:28}}><PolicontrolLogo size={56}/><h1 style={{fontSize:22,fontWeight:700,color:K.pri,margin:"12px 0 4px"}}>POLICONTROL USA</h1><p style={{fontSize:13,color:K.txM,margin:0}}>Manufacturing ERP</p></div>{le&&<div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#991b1b",marginBottom:12}}>{le}</div>}<div style={{marginBottom:12}}><label style={sl_}>Username</label><input value={lf.username} onChange={e=>setLf({...lf,username:e.target.value})} onKeyDown={e=>e.key==="Enter"&&doLogin()} style={{...si_,width:"100%",boxSizing:"border-box"}} autoFocus/></div><div style={{marginBottom:20}}><label style={sl_}>Password</label><input type="password" value={lf.password} onChange={e=>setLf({...lf,password:e.target.value})} onKeyDown={e=>e.key==="Enter"&&doLogin()} style={{...si_,width:"100%",boxSizing:"border-box"}}/></div><button onClick={doLogin} style={{...sb_,width:"100%",padding:"12px",fontSize:15}}>Sign In</button></div></div>);
+  if (as==="checking"||!user) return (<div style={{minHeight:"100vh",background:K.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><PolicontrolLogo size={64}/></div>);
   return <MainApp user={user} onLogout={doLogout}/>;
 }
 function MainApp({ user, onLogout }) {
@@ -1561,6 +1561,138 @@ function EquipmentView({ S, sv, aLog }) {
   );
 }
 
+/* ── Stock AI Assistant (voice + text) ── */
+function StockAssistant({ rawMaterials, sv, aLog }) {
+  const [input, setInput] = useState("");
+  const [listening, setListening] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const recognitionRef = useRef(null);
+
+  const startListening = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setError("Voice not supported in this browser. Use Chrome."); return; }
+    const r = new SR();
+    r.lang = "en-US"; r.continuous = false; r.interimResults = false;
+    r.onresult = (e) => { const t = e.results[0][0].transcript; setInput(t); setListening(false); };
+    r.onerror = () => setListening(false);
+    r.onend = () => setListening(false);
+    recognitionRef.current = r;
+    r.start(); setListening(true);
+  };
+
+  const stopListening = () => { recognitionRef.current?.stop(); setListening(false); };
+
+  const processCommand = async () => {
+    if (!input.trim()) return;
+    setLoading(true); setError(""); setResult(null); setSaved(false);
+    try {
+      const matList = rawMaterials.map(m => `${m.id}: ${m.code} - ${m.name} (${m.unit})`).join("\n");
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514", max_tokens: 1000,
+          messages: [{ role: "user", content: `You manage inventory for a chemical factory. Parse this command into a JSON action.
+
+AVAILABLE MATERIALS:
+${matList}
+
+COMMAND: "${input}"
+
+Respond ONLY with valid JSON, no markdown:
+{
+  "action": "add_stock" or "update_stock" or "check_stock",
+  "materialId": "rm-XXX",
+  "materialName": "Human readable name",
+  "quantity": 1000,
+  "unit": "g or mL or pcs",
+  "lotNumber": "LOT-XXXXX or empty",
+  "expirationDate": "YYYY-MM-DD or empty",
+  "summary": "Brief description of what will be done"
+}
+
+Match material by name even if approximate (e.g. "sulfuric acid" = "Sulfuric Acid (Analytical Grade)").
+For "new shipment" or "received" → action = "add_stock".
+For "current stock is" or "we have" → action = "update_stock".
+For "how much" or "check" → action = "check_stock".
+Convert units if needed (1 kg = 1000 g, 1 L = 1000 mL).` }],
+        }),
+      });
+      const data = await res.json();
+      const text = data.content?.map(c => c.text || "").join("") || "";
+      const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+      setResult(parsed);
+    } catch (e) {
+      setError("Could not understand. Try: 'New shipment of 500g DPD Sulfate lot 12345'");
+    }
+    setLoading(false);
+  };
+
+  const applyAction = async () => {
+    if (!result) return;
+    const mats = [...rawMaterials];
+    const rm = mats.find(m => m.id === result.materialId);
+    if (!rm) { setError("Material not found: " + result.materialId); return; }
+
+    if (result.action === "add_stock") {
+      const q = Number(result.quantity);
+      rm.entries = [...(rm.entries||[]), {
+        id: "e-" + Date.now(),
+        lotNumber: result.lotNumber || "LOT-" + Date.now().toString().slice(-6),
+        quantity: q, remaining: q,
+        purchaseDate: new Date().toISOString().slice(0,10),
+        expirationDate: result.expirationDate || "",
+      }];
+      await sv("rawMaterials", mats);
+      await aLog("AI Stock In", rm.code + " +" + q + " " + rm.unit + (result.lotNumber ? " Lot " + result.lotNumber : ""));
+    } else if (result.action === "check_stock") {
+      const total = (rm.entries||[]).reduce((s,e) => s + (e.remaining||0), 0);
+      setResult({...result, summary: `${rm.name}: ${total} ${rm.unit} in stock (${(rm.entries||[]).length} lots)`});
+      return;
+    }
+    setSaved(true);
+  };
+
+  return (
+    <div style={{background:"linear-gradient(135deg,#0057a8 0%,#00a5b5 100%)",borderRadius:14,padding:20,marginBottom:20,color:"white"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+        <span style={{fontSize:22}}>🤖</span>
+        <div>
+          <div style={{fontSize:15,fontWeight:700}}>Stock Assistant</div>
+          <div style={{fontSize:12,opacity:0.8}}>Type or speak to manage inventory</div>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <input value={input} onChange={e=>{setInput(e.target.value);setResult(null);setSaved(false)}}
+          onKeyDown={e=>e.key==="Enter"&&processCommand()}
+          placeholder='e.g. "New shipment 1kg sulfuric acid lot 12345"'
+          style={{flex:1,padding:"12px 16px",borderRadius:8,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.15)",color:"white",fontSize:14,outline:"none",fontFamily:"inherit"}} />
+        <button onClick={listening?stopListening:startListening} style={{width:48,height:48,borderRadius:24,border:"2px solid rgba(255,255,255,0.4)",background:listening?"#dc2626":"rgba(255,255,255,0.2)",color:"white",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Voice input">
+          {listening?"⏹":"🎤"}
+        </button>
+        <button onClick={processCommand} disabled={loading||!input.trim()} style={{padding:"12px 20px",borderRadius:8,border:"none",background:"white",color:"#0057a8",fontWeight:700,fontSize:14,cursor:"pointer",opacity:loading||!input.trim()?0.5:1}}>
+          {loading?"...":"Go"}
+        </button>
+      </div>
+      {listening && <div style={{marginTop:8,fontSize:13,display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:4,background:"#dc2626",animation:"pulse 1s infinite"}}></span> Listening... speak now</div>}
+      {error && <div style={{marginTop:10,background:"rgba(255,0,0,0.2)",borderRadius:8,padding:"8px 12px",fontSize:13}}>{error}</div>}
+      {result && !saved && (
+        <div style={{marginTop:12,background:"rgba(255,255,255,0.15)",borderRadius:10,padding:14}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>📋 {result.summary}</div>
+          <div style={{fontSize:12,opacity:0.9,marginBottom:10}}>
+            {result.action==="add_stock" && `Add ${result.quantity} ${result.unit} of ${result.materialName}${result.lotNumber?" (Lot: "+result.lotNumber+")":""}`}
+            {result.action==="check_stock" && result.summary}
+          </div>
+          {result.action!=="check_stock" && <button onClick={applyAction} style={{padding:"8px 20px",borderRadius:6,border:"none",background:"white",color:"#0057a8",fontWeight:700,fontSize:13,cursor:"pointer"}}>✅ Confirm & Apply</button>}
+        </div>
+      )}
+      {saved && <div style={{marginTop:10,fontSize:14,fontWeight:600}}>✅ Done! Stock updated.</div>}
+    </div>
+  );
+}
+
 /* ── Raw Materials ── */
 function RawMView({ S, sv, aLog, alerts, sub, setSub }) {
   const [tab, setTab] = useState("catalog");
@@ -1586,6 +1718,8 @@ function RawMView({ S, sv, aLog, alerts, sub, setSub }) {
 
   return (
     <PW title="Raw Materials" sub="Manage catalog and inventory">
+      {/* AI Stock Assistant */}
+      <StockAssistant rawMaterials={mats} sv={sv} aLog={aLog} />
       {/* Alerts */}
       {alerts.length > 0 && (
         <div style={{marginBottom:16}}>
@@ -1987,73 +2121,48 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
 
   const getVal = (f) => f.id==="lot" ? (lotText||"LOT: ________") : (expText||"EXP: ________");
 
-  const printFrameRef = useRef(null);
   const handlePrint = () => {
-    const W = labelSize.w, H = labelSize.h;
     const bgImg = tpl?.imageData && !tpl.isPdf ? tpl.imageData : null;
     if (!bgImg) return;
-    const ov = overlayFields.map(f => {
-      const val = f.id==="lot" ? (lotText?"LOT: "+lotText:"") : (expText?"EXP: "+expText:"");
-      if(!val) return "";
-      return `<div style="position:absolute;left:${f.x}%;top:${f.y}%;transform:translate(-50%,-50%);font-size:${f.fontSize}pt;font-weight:${f.fontWeight};color:${f.color};white-space:nowrap;">${val}</div>`;
-    }).join("");
+    const W = labelSize.w, H = labelSize.h;
+    const DPI = 300;
+    const Wpx = Math.round(W * DPI), Hpx = Math.round(H * DPI);
 
-    const labelHtml = `<div class="label"><img src="${bgImg}" />${ov}</div>`;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = Wpx; canvas.height = Hpx;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, Wpx, Hpx);
 
-    const html = `<!DOCTYPE html><html><head>
-<style>
-  @page { size: ${W}in ${H}in; margin: 0; }
-  @media print {
-    @page { size: ${W}in ${H}in; margin: 0; }
-    html, body { margin:0; padding:0; }
-    #toolbar { display:none !important; }
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:Arial,sans-serif; background:#f5f5f5; }
-  #toolbar { background:#0057a8; color:white; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; }
-  #toolbar button { background:white; color:#0057a8; border:none; padding:10px 24px; border-radius:6px; font-size:16px; font-weight:bold; cursor:pointer; }
-  #toolbar button:disabled { opacity:0.5; cursor:wait; }
-  .labels { display:flex; flex-wrap:wrap; gap:16px; padding:20px; justify-content:center; }
-  .label { width:${W}in; height:${H}in; position:relative; overflow:hidden; page-break-after:always; box-shadow:0 2px 8px rgba(0,0,0,0.15); }
-  .label img { width:100%; height:100%; object-fit:fill; display:block; }
-</style>
-</head><body>
-<div id="toolbar">
-  <span>Policontrol Label — ${W}" x ${H}" — ${qty} label(s)</span>
-  <button id="printBtn" disabled onclick="window.print()">Loading...</button>
-</div>
-<div class="labels">
-${Array(qty).fill(labelHtml).join("\n")}
-</div>
-<script>
-var imgs = document.querySelectorAll('.label img');
-var loaded = 0;
-function onLoad() {
-  loaded++;
-  if (loaded >= imgs.length) {
-    document.getElementById('printBtn').disabled = false;
-    document.getElementById('printBtn').textContent = 'PRINT (Ctrl+P)';
-  }
-}
-for (var i = 0; i < imgs.length; i++) {
-  if (imgs[i].complete) onLoad();
-  else { imgs[i].onload = onLoad; imgs[i].onerror = onLoad; }
-}
-if (imgs.length === 0) onLoad();
-</script>
-</body></html>`;
+      overlayFields.forEach(f => {
+        const val = f.id==="lot" ? (lotText?"LOT: "+lotText:"") : (expText?"EXP: "+expText:"");
+        if (!val) return;
+        const x = (f.x / 100) * Wpx;
+        const y = (f.y / 100) * Hpx;
+        const fontSize = Math.round(f.fontSize * (DPI / 72));
+        ctx.font = (f.fontWeight==="bold"?"bold ":"") + fontSize + "px Arial";
+        ctx.fillStyle = f.color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(val, x, y);
+      });
 
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, "_blank");
-    if (!win) {
-      const a = document.createElement("a");
-      a.href = url; a.download = `label_${p.brand}_${lotText||"batch"}_${size}.html`; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    } else {
-      const check = setInterval(() => { if (win.closed) { clearInterval(check); URL.revokeObjectURL(url); } }, 1000);
-    }
-    aLog("Printed labels", `${p.brand} ${lotText} ${qty}x ${size}`);
+      const dataUrl = canvas.toDataURL("image/png");
+      const html = '<!DOCTYPE html><html><head><style>@page{size:' + W + 'in ' + H + 'in;margin:0}@media print{body{margin:0}#bar{display:none}}*{margin:0;padding:0}body{font-family:Arial;background:#eee}#bar{background:#0057a8;color:white;padding:10px 16px;display:flex;justify-content:space-between;align-items:center}#bar button{background:white;color:#0057a8;border:none;padding:8px 20px;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer}.wrap{padding:16px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center}.lbl{width:' + W + 'in;height:' + H + 'in;box-shadow:0 2px 8px rgba(0,0,0,0.2)}.lbl img{width:100%;height:100%;display:block}</style></head><body><div id="bar"><span>' + qty + ' label(s) - ' + W + '" x ' + H + '" - ' + p.brand + '</span><button onclick="window.print()">PRINT</button></div><div class="wrap">' + Array(qty).fill('<div class="lbl"><img src="' + dataUrl + '"/></div>').join("") + '</div></body></html>';
+
+      const blob = new Blob([html], {type:"text/html"});
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = "label_" + p.brand + "_" + (lotText||"batch") + ".png";
+        a.click();
+      }
+    };
+    img.src = bgImg;
+    aLog("Printed labels", p.brand + " " + lotText + " " + qty + "x " + size);
   };
 
   const PXI = 80;
