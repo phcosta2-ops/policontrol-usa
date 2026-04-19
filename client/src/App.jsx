@@ -2117,46 +2117,56 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
 
   const getVal = (f) => f.id==="lot" ? (lotText||"LOT: ________") : (expText||"EXP: ________");
 
+  const [printStatus, setPrintStatus] = useState("");
   const handlePrint = () => {
     const bgImg = tpl?.imageData && !tpl.isPdf ? tpl.imageData : null;
-    if (!bgImg) return;
+    if (!bgImg) { setPrintStatus("❌ No template uploaded"); return; }
+    setPrintStatus("⏳ Generating label...");
     const W = labelSize.w, H = labelSize.h;
     const DPI = 300;
     const Wpx = Math.round(W * DPI), Hpx = Math.round(H * DPI);
 
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = Wpx; canvas.height = Hpx;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, Wpx, Hpx);
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onerror = () => setPrintStatus("❌ Failed to load template image");
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = Wpx; canvas.height = Hpx;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, Wpx, Hpx);
 
-      // Draw overlay text
-      overlayFields.forEach(f => {
-        const val = f.id==="lot" ? (lotText?"LOT: "+lotText:"") : (expText?"EXP: "+expText:"");
-        if (!val) return;
-        const x = (f.x / 100) * Wpx;
-        const y = (f.y / 100) * Hpx;
-        const fontSize = Math.round(f.fontSize * (DPI / 72));
-        ctx.font = (f.fontWeight==="bold"?"bold ":"") + fontSize + "px Arial";
-        ctx.fillStyle = f.color;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(val, x, y);
-      });
+          overlayFields.forEach(f => {
+            const val = f.id==="lot" ? (lotText?"LOT: "+lotText:"") : (expText?"EXP: "+expText:"");
+            if (!val) return;
+            const x = (f.x / 100) * Wpx;
+            const y = (f.y / 100) * Hpx;
+            const fontSize = Math.round(f.fontSize * (DPI / 72));
+            ctx.font = (f.fontWeight==="bold"?"bold ":"") + fontSize + "px Arial";
+            ctx.fillStyle = f.color;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(val, x, y);
+          });
 
-      // Download as PNG
-      canvas.toBlob(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "label_" + p.brand + "_" + (lotText||"batch") + ".png";
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 3000);
-      }, "image/png");
-    };
-    img.src = bgImg;
-    aLog("Printed labels", p.brand + " " + (lotText||"") + " " + qty + "x " + size);
+          const dataUrl = canvas.toDataURL("image/png");
+          const a = document.createElement("a");
+          a.href = dataUrl;
+          a.download = "label_" + p.brand + "_" + (lotText||"batch") + ".png";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setPrintStatus("✅ PNG downloaded! Open it and press Ctrl+P to print.");
+          aLog("Label PNG", p.brand + " " + (lotText||"") + " " + size);
+        } catch(e) {
+          setPrintStatus("❌ Canvas error: " + e.message);
+        }
+      };
+      img.src = bgImg;
+    } catch(e) {
+      setPrintStatus("❌ Error: " + e.message);
+    }
   };
 
   const PXI = 80;
@@ -2278,6 +2288,7 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
                 <button onClick={handlePrint} disabled={!hasTemplate} style={{...sb_,padding:"10px 24px",fontSize:14,opacity:hasTemplate?1:0.4}}>
                   🖨️ Download Label PNG
                 </button>
+                {printStatus && <div style={{fontSize:12,marginTop:6,color:printStatus.startsWith("✅")?K.ok:printStatus.startsWith("❌")?K.er:K.txM}}>{printStatus}</div>}
               </div>
             </div>
 
