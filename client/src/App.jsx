@@ -1065,7 +1065,7 @@ function ProductView({ p, S, sv, addLog, getStock, getSteps, go, onBack }) {
       {KIT_PROCESSES.map((proc, i) => {
         const steps = getSteps(p.id, proc.id);
         const isLabel = proc.id === "label-print";
-        const tpl4 = (S.labelTemplates||{})[p.id+"__4x2"];
+        const tpl4 = (S.labelTemplates||{})[p.id+"__4x3"];
         const tpl2 = (S.labelTemplates||{})[p.id+"__2.25x1.25"];
         const hasTemplates = tpl4?.imageData || tpl2?.imageData;
         return (
@@ -1919,14 +1919,14 @@ function QCView({ S, sv, aLog, sub, setSub, user }) {
 
 /* ── Label Printer (Epson CW-C4000) ── */
 const LABEL_SIZES = [
-  { id:"4x2", name:'4" × 2"', w:4, h:2, desc:"Large label" },
+  { id:"4x3", name:'4" × 3"', w:4, h:3, desc:"Large label" },
   { id:"2.25x1.25", name:'2.25" × 1.25"', w:2.25, h:1.25, desc:"Small label (landscape)" },
 ];
 
 function LabelPrintPanel({ product, S, sv, aLog }) {
   const p = product;
   const [open, setOpen] = useState(false);
-  const [size, setSize] = useState("4x2");
+  const [size, setSize] = useState("4x3");
   const [lotId, setLotId] = useState("");
   const [qty, setQty] = useState(1);
   const [lotText, setLotText] = useState("");
@@ -1990,6 +1990,8 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
   const printFrameRef = useRef(null);
   const handlePrint = () => {
     const W = labelSize.w, H = labelSize.h;
+    const DPI = 96;
+    const Wpx = Math.round(W * DPI), Hpx = Math.round(H * DPI);
     const bgImg = tpl?.imageData && !tpl.isPdf ? tpl.imageData : null;
     const ov = overlayFields.map(f => {
       const val = f.id==="lot" ? (lotText?"LOT: "+lotText:"") : (expText?"EXP: "+expText:"");
@@ -2000,44 +2002,33 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
     const html = `<!DOCTYPE html><html><head>
 <style>
   @page { size: ${W}in ${H}in; margin: 0; }
-  @media print { @page { size: ${W}in ${H}in; margin: 0; } body { margin: 0; } }
+  @media print { @page { size: ${W}in ${H}in; margin: 0; } html,body { margin:0; padding:0; } }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:Arial,sans-serif; width:${W}in; }
-  .label { width:${W}in; height:${H}in; position:relative; page-break-after:always; overflow:hidden; }
-  .label img { width:100%; height:100%; object-fit:fill; display:block; }
+  body { width:${Wpx}px; }
+  .label { width:${Wpx}px; height:${Hpx}px; position:relative; page-break-after:always; overflow:hidden; }
+  .label img { width:${Wpx}px; height:${Hpx}px; object-fit:fill; display:block; }
 </style>
 </head><body>
 ${Array(qty).fill(0).map(()=>
-  `<div class="label">${bgImg ? `<img src="${bgImg}" />` : '<div style="width:100%;height:100%;border:0.5px solid #ccc"></div>'}${ov}</div>`
+  `<div class="label">${bgImg ? `<img src="${bgImg}" />` : ''}${ov}</div>`
 ).join("\n")}
-<script>
-  // Wait for all images to load before printing
-  var imgs = document.querySelectorAll('img');
-  var loaded = 0;
-  var total = imgs.length;
-  function checkPrint() {
-    loaded++;
-    if (loaded >= total) {
-      setTimeout(function() { window.print(); }, 200);
-    }
-  }
-  if (total === 0) { setTimeout(function() { window.print(); }, 200); }
-  else { for (var i = 0; i < imgs.length; i++) { imgs[i].onload = checkPrint; imgs[i].onerror = checkPrint; if (imgs[i].complete) checkPrint(); } }
-</script>
 </body></html>`;
 
-    // Open in new window — print dialog will appear with correct page size
-    const win = window.open("", "_blank", "width=700,height=500");
+    // Use Blob URL — works much better than document.write for large base64 images
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank", `width=${Wpx+50},height=${Hpx+100}`);
     if (win) {
-      win.document.write(html);
-      win.document.close();
+      win.onload = () => { setTimeout(() => win.print(), 500); };
+      // Cleanup after window closes
+      const check = setInterval(() => { if (win.closed) { clearInterval(check); URL.revokeObjectURL(url); } }, 1000);
     } else {
-      // Fallback: download as HTML file — user opens in Chrome and prints
-      const blob = new Blob([html], {type:"text/html"});
+      // Fallback: download HTML file
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `label_${p.brand}_${lotText||"batch"}_${size}.html`;
       a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     }
     aLog("Printed labels", `${p.brand} ${lotText} ${qty}x ${size}`);
   };
