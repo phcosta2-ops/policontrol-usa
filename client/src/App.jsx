@@ -1999,36 +1999,42 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
       return `<div style="position:absolute;left:${f.x}%;top:${f.y}%;transform:translate(-50%,-50%);font-size:${f.fontSize}pt;font-weight:${f.fontWeight};color:${f.color};white-space:nowrap;">${val}</div>`;
     }).join("");
 
+    // Use CSS background-image instead of <img> — much more reliable for printing base64
+    const bgStyle = bgImg ? `background-image:url(${bgImg});background-size:100% 100%;background-repeat:no-repeat;` : "";
+
     const html = `<!DOCTYPE html><html><head>
 <style>
   @page { size: ${W}in ${H}in; margin: 0; }
-  @media print { @page { size: ${W}in ${H}in; margin: 0; } html,body { margin:0; padding:0; } }
+  @media print {
+    @page { size: ${W}in ${H}in; margin: 0; }
+    html, body { margin:0; padding:0; }
+    .label { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { width:${Wpx}px; }
-  .label { width:${Wpx}px; height:${Hpx}px; position:relative; page-break-after:always; overflow:hidden; }
-  .label img { width:${Wpx}px; height:${Hpx}px; object-fit:fill; display:block; }
+  .label {
+    width:${Wpx}px; height:${Hpx}px; position:relative; page-break-after:always; overflow:hidden;
+    ${bgStyle}
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
 </style>
 </head><body>
-${Array(qty).fill(0).map(()=>
-  `<div class="label">${bgImg ? `<img src="${bgImg}" />` : ''}${ov}</div>`
-).join("\n")}
+${Array(qty).fill(0).map(()=> `<div class="label">${ov}</div>`).join("\n")}
+<script>
+  // Small delay then print
+  setTimeout(function() { window.print(); }, 300);
+</script>
 </body></html>`;
 
-    // Use Blob URL — works much better than document.write for large base64 images
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const win = window.open(url, "_blank", `width=${Wpx+50},height=${Hpx+100}`);
-    if (win) {
-      win.onload = () => { setTimeout(() => win.print(), 500); };
-      // Cleanup after window closes
-      const check = setInterval(() => { if (win.closed) { clearInterval(check); URL.revokeObjectURL(url); } }, 1000);
-    } else {
-      // Fallback: download HTML file
+    if (!win) {
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `label_${p.brand}_${lotText||"batch"}_${size}.html`;
-      a.click();
+      a.href = url; a.download = `label_${p.brand}_${lotText||"batch"}_${size}.html`; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } else {
+      const check = setInterval(() => { if (win.closed) { clearInterval(check); URL.revokeObjectURL(url); } }, 1000);
     }
     aLog("Printed labels", `${p.brand} ${lotText} ${qty}x ${size}`);
   };
