@@ -2276,16 +2276,7 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
                   {(S.lots||[]).filter(l=>l.productId===p.id).map(l=><option key={l.id} value={l.id}>{l.lotNumber}</option>)}
                 </select>
                 <button onClick={handlePrint} disabled={!hasTemplate} style={{...sb_,padding:"10px 24px",fontSize:14,opacity:hasTemplate?1:0.4}}>
-                  🖨️ Print {qty}x
-                </button>
-                <button onClick={()=>{
-                  const W=labelSize.w,H=labelSize.h,bgImg=tpl?.imageData&&!tpl.isPdf?tpl.imageData:null;
-                  const ov=overlayFields.map(f=>{const val=f.id==="lot"?(lotText?"LOT: "+lotText:""):(expText?"EXP: "+expText:"");if(!val)return"";return`<div style="position:absolute;left:${f.x}%;top:${f.y}%;transform:translate(-50%,-50%);font-size:${f.fontSize}pt;font-weight:${f.fontWeight};color:${f.color};white-space:nowrap;">${val}</div>`}).join("");
-                  const html=`<!DOCTYPE html><html><head><style>@page{size:${W}in ${H}in;margin:0}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif}.label{width:${W}in;height:${H}in;position:relative;page-break-after:always;overflow:hidden}.label img{width:100%;height:100%;object-fit:contain}</style></head><body>${Array(qty).fill(0).map(()=>`<div class="label">${bgImg?`<img src="${bgImg}"/>`:""} ${ov}</div>`).join("")}</body></html>`;
-                  const blob=new Blob([html],{type:"text/html"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`label_${p.brand}_${size}.html`;a.click();
-                  aLog("Downloaded label",`${p.brand} ${qty}x ${size}`);
-                }} disabled={!hasTemplate} style={{...so_,padding:"10px 16px",fontSize:13,opacity:hasTemplate?1:0.4}} title="Download HTML file — open in Chrome and print">
-                  ⬇ Download
+                  🖨️ Download Label PNG
                 </button>
               </div>
             </div>
