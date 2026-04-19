@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { login as apiLogin, logout as apiLogout, getMe, loadData as apiLoadData, saveData as apiSaveData, getToken, setToken } from "./api";
 
 /* ── PRODUCT CATEGORIES ── */
 const CATEGORIES = [
@@ -321,18 +322,9 @@ DEF_BOM["pow-cl-ultra"] = [
 DEF_BOM["pow-cl-aws"] = DEF_BOM["pow-cl-ultra"];
 DEF_BOM["pow-cl-pol"] = DEF_BOM["pow-cl-ultra"];
 
-/* ── STORAGE (single key for speed) ── */
-const STORE_KEY = "pc-data-v2";
-async function stGet(k) { try { const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; } catch { return null; } }
-async function stSet(k, v) { try { await window.storage.set(k, JSON.stringify(v)); } catch {} }
-async function loadAll() {
-  const cached = await stGet(STORE_KEY);
-  if (cached && cached._ver === 2) return cached;
-  return null;
-}
-async function saveAll(data) {
-  await stSet(STORE_KEY, { ...data, _ver: 2 });
-}
+/* ── STORAGE (API) ── */
+async function loadAll() { try { const d = await apiLoadData(); return d && Object.keys(d).length > 1 ? d : null; } catch { return null; } }
+async function saveAll(data) { try { await apiSaveData(data); } catch(e) { console.error("Save:",e); } }
 
 /* Helper: get componentKey from product (handles old products without it) */
 function getCompKey(p) {
@@ -499,8 +491,19 @@ function PhotoBox({ images=[], onChange, canEdit=true }) {
 
 /* ══════════ MAIN APP ══════════ */
 export default function App() {
+  const [authState, setAuthState] = useState(getToken() ? "checking" : "login");
+  const [user, setUser] = useState(null);
+  const [lf, setLf] = useState({ username: "", password: "" });
+  const [le, setLe] = useState("");
+  useEffect(() => { if (authState==="checking") getMe().then(r=>{setUser(r.user);setAuthState("ok")}).catch(()=>{setToken("");setAuthState("login")}); }, [authState]);
+  const doLogin = async () => { setLe(""); try { const u = await apiLogin(lf.username, lf.password); setUser(u); setAuthState("ok"); } catch(e) { setLe(e.message||"Invalid credentials"); } };
+  const doLogout = async () => { await apiLogout(); setUser(null); setAuthState("login"); };
+  if (authState==="login") return (<div style={{minHeight:"100vh",background:K.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:K.cd,borderRadius:16,padding:40,width:360,boxShadow:"0 4px 24px rgba(0,0,0,0.08)",border:`1px solid ${K.bd}`}}><div style={{textAlign:"center",marginBottom:28}}><PolicontrolLogo size={56}/><h1 style={{fontSize:22,fontWeight:700,color:K.pri,margin:"12px 0 4px"}}>POLICONTROL USA</h1><p style={{fontSize:13,color:K.txM,margin:0}}>Manufacturing ERP</p></div>{le&&<div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#991b1b",marginBottom:12}}>{le}</div>}<div style={{marginBottom:12}}><label style={sl_}>Username</label><input value={lf.username} onChange={e=>setLf({...lf,username:e.target.value})} onKeyDown={e=>e.key==="Enter"&&doLogin()} style={{...si_,width:"100%",boxSizing:"border-box"}} autoFocus/></div><div style={{marginBottom:20}}><label style={sl_}>Password</label><input type="password" value={lf.password} onChange={e=>setLf({...lf,password:e.target.value})} onKeyDown={e=>e.key==="Enter"&&doLogin()} style={{...si_,width:"100%",boxSizing:"border-box"}}/></div><button onClick={doLogin} style={{...sb_,width:"100%",padding:"12px",fontSize:15}}>Sign In</button></div></div>);
+  if (authState==="checking"||!user) return (<div style={{minHeight:"100vh",background:K.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><PolicontrolLogo size={64}/></div>);
+  return <MainApp user={user} onLogout={doLogout}/>;
+}
+function MainApp({ user, onLogout }) {
   const [loading, setLoading] = useState(true);
-  const user = { username:"admin", name:"Admin", role:"admin" };
   const [S, setS] = useState({});
   const [nav, setNav] = useState({ v:"dashboard", prod:null, comp:null, proc:null, si:0, edit:false, sub:null });
   const [sidebar, setSidebar] = useState(false);
@@ -670,8 +673,8 @@ export default function App() {
             {m.badge>0&&<span style={{position:"absolute",top:4,right:sidebar?8:4,minWidth:18,height:18,borderRadius:9,background:K.er,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{m.badge>9?"9+":m.badge}</span>}
           </div>))}
         </div>
-        <div style={{padding:10,borderTop:`1px solid ${K.bd}`,display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:17,flexShrink:0}}>👤</span>{sidebar&&<span style={{fontSize:12,color:K.txM}}>{user.name}</span>}
+        <div style={{padding:10,borderTop:`1px solid ${K.bd}`,display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={onLogout} title="Logout">
+          <span style={{fontSize:17,flexShrink:0}}>👤</span>{sidebar&&<><span style={{fontSize:12,color:K.txM,flex:1}}>{user.name}</span><span style={{fontSize:10,color:K.txD}}>↪</span></>}
         </div>
       </div>
 
