@@ -1565,7 +1565,6 @@ function EquipmentView({ S, sv, aLog }) {
 function StockAssistant({ rawMaterials, sv, aLog }) {
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -1573,85 +1572,86 @@ function StockAssistant({ rawMaterials, sv, aLog }) {
 
   const startListening = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setError("Voice not supported in this browser. Use Chrome."); return; }
+    if (!SR) { setError("Voice not supported. Use Chrome."); return; }
     const r = new SR();
     r.lang = "en-US"; r.continuous = false; r.interimResults = false;
-    r.onresult = (e) => { const t = e.results[0][0].transcript; setInput(t); setListening(false); };
+    r.onresult = (e) => { setInput(e.results[0][0].transcript); setListening(false); };
     r.onerror = () => setListening(false);
     r.onend = () => setListening(false);
     recognitionRef.current = r;
     r.start(); setListening(true);
   };
-
   const stopListening = () => { recognitionRef.current?.stop(); setListening(false); };
 
-  const processCommand = async () => {
-    if (!input.trim()) return;
-    setLoading(true); setError(""); setResult(null); setSaved(false);
-    try {
-      const matList = rawMaterials.map(m => `${m.id}: ${m.code} - ${m.name} (${m.unit})`).join("\n");
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
-          messages: [{ role: "user", content: `You manage inventory for a chemical factory. Parse this command into a JSON action.
-
-AVAILABLE MATERIALS:
-${matList}
-
-COMMAND: "${input}"
-
-Respond ONLY with valid JSON, no markdown:
-{
-  "action": "add_stock" or "update_stock" or "check_stock",
-  "materialId": "rm-XXX",
-  "materialName": "Human readable name",
-  "quantity": 1000,
-  "unit": "g or mL or pcs",
-  "lotNumber": "LOT-XXXXX or empty",
-  "expirationDate": "YYYY-MM-DD or empty",
-  "summary": "Brief description of what will be done"
-}
-
-Match material by name even if approximate (e.g. "sulfuric acid" = "Sulfuric Acid (Analytical Grade)").
-For "new shipment" or "received" → action = "add_stock".
-For "current stock is" or "we have" → action = "update_stock".
-For "how much" or "check" → action = "check_stock".
-Convert units if needed (1 kg = 1000 g, 1 L = 1000 mL).` }],
-        }),
-      });
-      const data = await res.json();
-      const text = data.content?.map(c => c.text || "").join("") || "";
-      const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-      setResult(parsed);
-    } catch (e) {
-      setError("Could not understand. Try: 'New shipment of 500g DPD Sulfate lot 12345'");
+  const parseCommand = (text) => {
+    const t = text.toLowerCase().trim();
+    // Find material by matching name/code
+    let bestMatch = null, bestScore = 0;
+    for (const rm of rawMaterials) {
+      const names = [rm.name.toLowerCase(), rm.code.toLowerCase()];
+      for (const n of names) {
+        // Check if any significant words from material name appear in command
+        const words = n.split(/[^a-z0-9]+/).filter(w => w.length > 2);
+        const score = words.filter(w => t.includes(w)).length;
+        if (score > bestScore) { bestScore = score; bestMatch = rm; }
+      }
     }
-    setLoading(false);
+    if (!bestMatch || bestScore === 0) return null;
+
+    // Parse quantity: look for number followed by unit
+    const qtyMatch = t.match(/([\d,.]+)\s*(kg|g|ml|l|liters?|grams?|kilos?|pcs|pieces?|units?|bottles?)/i);
+    let qty = 0, unit = bestMatch.unit;
+    if (qtyMatch) {
+      qty = parseFloat(qtyMatch[1].replace(",",""));
+      const u = qtyMatch[2].toLowerCase();
+      if (u.startsWith("kg") || u.startsWith("kilo")) { qty *= 1000; unit = "g"; }
+      else if (u === "l" || u.startsWith("liter")) { qty *= 1000; unit = "mL"; }
+      else if (u.startsWith("g")) unit = "g";
+      else if (u.startsWith("ml")) unit = "mL";
+      else if (u.startsWith("pcs") || u.startsWith("piece") || u.startsWith("unit") || u.startsWith("bottle")) unit = "pcs";
+    }
+
+    // Parse lot number
+    const lotMatch = t.match(/lot\s*(?:#|number|num|no)?[\s.:]*([a-z0-9-_]+)/i);
+    const lotNumber = lotMatch ? lotMatch[1].toUpperCase() : "";
+
+    // Determine action
+    let action = "add_stock";
+    if (/how much|check|what.*stock|current stock|do we have|available/i.test(t)) action = "check_stock";
+
+    return { action, materialId: bestMatch.id, materialName: bestMatch.name, materialCode: bestMatch.code, quantity: qty, unit, lotNumber };
+  };
+
+  const processCommand = () => {
+    if (!input.trim()) return;
+    setError(""); setResult(null); setSaved(false);
+    const parsed = parseCommand(input);
+    if (!parsed) { setError("Could not find a matching material. Try including the material name (e.g. 'DPD Sulfate', 'sulfuric acid', 'EDTA')."); return; }
+    if (parsed.action === "check_stock") {
+      const rm = rawMaterials.find(m => m.id === parsed.materialId);
+      const total = (rm?.entries||[]).reduce((s,e) => s + (e.remaining||0), 0);
+      setResult({...parsed, action:"check_stock", summary: rm.name + ": " + total + " " + rm.unit + " in stock (" + (rm?.entries||[]).length + " lots)"});
+      return;
+    }
+    if (!parsed.quantity) { setError("Could not detect quantity. Include a number with unit (e.g. '500g', '1kg', '2L')."); return; }
+    setResult({...parsed, summary: "Add " + parsed.quantity + " " + parsed.unit + " of " + parsed.materialName + (parsed.lotNumber ? " (Lot: " + parsed.lotNumber + ")" : "")});
   };
 
   const applyAction = async () => {
-    if (!result) return;
-    const mats = [...rawMaterials];
-    const rm = mats.find(m => m.id === result.materialId);
-    if (!rm) { setError("Material not found: " + result.materialId); return; }
-
-    if (result.action === "add_stock") {
+    if (!result || result.action === "check_stock") return;
+    const mats = rawMaterials.map(m => {
+      if (m.id !== result.materialId) return m;
       const q = Number(result.quantity);
-      rm.entries = [...(rm.entries||[]), {
+      return {...m, entries: [...(m.entries||[]), {
         id: "e-" + Date.now(),
         lotNumber: result.lotNumber || "LOT-" + Date.now().toString().slice(-6),
         quantity: q, remaining: q,
         purchaseDate: new Date().toISOString().slice(0,10),
-        expirationDate: result.expirationDate || "",
-      }];
-      await sv("rawMaterials", mats);
-      await aLog("AI Stock In", rm.code + " +" + q + " " + rm.unit + (result.lotNumber ? " Lot " + result.lotNumber : ""));
-    } else if (result.action === "check_stock") {
-      const total = (rm.entries||[]).reduce((s,e) => s + (e.remaining||0), 0);
-      setResult({...result, summary: `${rm.name}: ${total} ${rm.unit} in stock (${(rm.entries||[]).length} lots)`});
-      return;
-    }
+        expirationDate: "",
+      }]};
+    });
+    await sv("rawMaterials", mats);
+    await aLog("Stock In (voice)", result.materialCode + " +" + result.quantity + " " + result.unit + (result.lotNumber ? " Lot " + result.lotNumber : ""));
     setSaved(true);
   };
 
@@ -1667,24 +1667,20 @@ Convert units if needed (1 kg = 1000 g, 1 L = 1000 mL).` }],
       <div style={{display:"flex",gap:8}}>
         <input value={input} onChange={e=>{setInput(e.target.value);setResult(null);setSaved(false)}}
           onKeyDown={e=>e.key==="Enter"&&processCommand()}
-          placeholder='e.g. "New shipment 1kg sulfuric acid lot 12345"'
+          placeholder='"New shipment 500g DPD Sulfate lot 12345"'
           style={{flex:1,padding:"12px 16px",borderRadius:8,border:"2px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.15)",color:"white",fontSize:14,outline:"none",fontFamily:"inherit"}} />
         <button onClick={listening?stopListening:startListening} style={{width:48,height:48,borderRadius:24,border:"2px solid rgba(255,255,255,0.4)",background:listening?"#dc2626":"rgba(255,255,255,0.2)",color:"white",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Voice input">
           {listening?"⏹":"🎤"}
         </button>
-        <button onClick={processCommand} disabled={loading||!input.trim()} style={{padding:"12px 20px",borderRadius:8,border:"none",background:"white",color:"#0057a8",fontWeight:700,fontSize:14,cursor:"pointer",opacity:loading||!input.trim()?0.5:1}}>
-          {loading?"...":"Go"}
+        <button onClick={processCommand} disabled={!input.trim()} style={{padding:"12px 20px",borderRadius:8,border:"none",background:"white",color:"#0057a8",fontWeight:700,fontSize:14,cursor:"pointer",opacity:!input.trim()?0.5:1}}>
+          Go
         </button>
       </div>
-      {listening && <div style={{marginTop:8,fontSize:13,display:"flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:4,background:"#dc2626",animation:"pulse 1s infinite"}}></span> Listening... speak now</div>}
+      {listening && <div style={{marginTop:8,fontSize:13,display:"flex",alignItems:"center",gap:6}}>🔴 Listening... speak now</div>}
       {error && <div style={{marginTop:10,background:"rgba(255,0,0,0.2)",borderRadius:8,padding:"8px 12px",fontSize:13}}>{error}</div>}
       {result && !saved && (
         <div style={{marginTop:12,background:"rgba(255,255,255,0.15)",borderRadius:10,padding:14}}>
-          <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>📋 {result.summary}</div>
-          <div style={{fontSize:12,opacity:0.9,marginBottom:10}}>
-            {result.action==="add_stock" && `Add ${result.quantity} ${result.unit} of ${result.materialName}${result.lotNumber?" (Lot: "+result.lotNumber+")":""}`}
-            {result.action==="check_stock" && result.summary}
-          </div>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>📋 {result.summary}</div>
           {result.action!=="check_stock" && <button onClick={applyAction} style={{padding:"8px 20px",borderRadius:6,border:"none",background:"white",color:"#0057a8",fontWeight:700,fontSize:13,cursor:"pointer"}}>✅ Confirm & Apply</button>}
         </div>
       )}
@@ -2135,6 +2131,7 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, Wpx, Hpx);
 
+      // Draw overlay text
       overlayFields.forEach(f => {
         const val = f.id==="lot" ? (lotText?"LOT: "+lotText:"") : (expText?"EXP: "+expText:"");
         if (!val) return;
@@ -2148,21 +2145,18 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
         ctx.fillText(val, x, y);
       });
 
-      const dataUrl = canvas.toDataURL("image/png");
-      const html = '<!DOCTYPE html><html><head><style>@page{size:' + W + 'in ' + H + 'in;margin:0}@media print{body{margin:0}#bar{display:none}}*{margin:0;padding:0}body{font-family:Arial;background:#eee}#bar{background:#0057a8;color:white;padding:10px 16px;display:flex;justify-content:space-between;align-items:center}#bar button{background:white;color:#0057a8;border:none;padding:8px 20px;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer}.wrap{padding:16px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center}.lbl{width:' + W + 'in;height:' + H + 'in;box-shadow:0 2px 8px rgba(0,0,0,0.2)}.lbl img{width:100%;height:100%;display:block}</style></head><body><div id="bar"><span>' + qty + ' label(s) - ' + W + '" x ' + H + '" - ' + p.brand + '</span><button onclick="window.print()">PRINT</button></div><div class="wrap">' + Array(qty).fill('<div class="lbl"><img src="' + dataUrl + '"/></div>').join("") + '</div></body></html>';
-
-      const blob = new Blob([html], {type:"text/html"});
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, "_blank");
-      if (!win) {
+      // Download as PNG
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = dataUrl;
+        a.href = url;
         a.download = "label_" + p.brand + "_" + (lotText||"batch") + ".png";
         a.click();
-      }
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+      }, "image/png");
     };
     img.src = bgImg;
-    aLog("Printed labels", p.brand + " " + lotText + " " + qty + "x " + size);
+    aLog("Printed labels", p.brand + " " + (lotText||"") + " " + qty + "x " + size);
   };
 
   const PXI = 80;
