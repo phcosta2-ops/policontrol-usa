@@ -1,0 +1,1 @@
+{"name":"policontrol-usa","version":"1.0.0","description":"Manufacturing ERP for Policontrol USA","scripts":{"start":"node server/index.js","build":"cd client && npm run build","dev":"cd client && npm start","setup":"npm install && cd client && npm install && npm run build"},"dependencies":{"bcryptjs":"^2.4.3","express":"^4.18.2","multer":"^1.4.5-lts.1"}}
