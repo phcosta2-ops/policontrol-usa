@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { login as apiLogin, logout as apiLogout, getMe, loadData as apiLoadData, saveData as apiSaveData, getToken, setToken } from "./api";
 
 /* ── PRODUCT CATEGORIES ── */
 const CATEGORIES = [
@@ -227,19 +226,26 @@ const PRE_INSTR = {
 
 /* ── RAW MATERIALS & BOM ── */
 const DEF_RAW = [
-  { id:"rm-001", code:"RM-001", name:"Sulfuric Acid (Analytical Grade)", unit:"mL", minStock:200, vendor:"", entries:[] },
-  { id:"rm-002", code:"RM-002", name:"DPD Sulfate", unit:"g", minStock:300, vendor:"", entries:[] },
-  { id:"rm-003", code:"RM-003", name:"Boric Acid", unit:"g", minStock:1000, vendor:"", entries:[] },
-  { id:"rm-004", code:"RM-004", name:"Disodium EDTA", unit:"g", minStock:100, vendor:"", entries:[] },
-  { id:"rm-005", code:"RM-005", name:"KH2PO4 (Potassium Monobasic Phosphate)", unit:"g", minStock:2500, vendor:"", entries:[] },
-  { id:"rm-006", code:"RM-006", name:"Na2HPO4 (Disodium Bibasic Phosphate)", unit:"g", minStock:2500, vendor:"", entries:[] },
-  { id:"rm-007", code:"RM-007", name:"Bottles 16oz", unit:"pcs", minStock:100, vendor:"", entries:[] },
-  { id:"rm-008", code:"RM-008", name:"Dark Ziplock Bag", unit:"pcs", minStock:50, vendor:"", entries:[] },
-  { id:"rm-009", code:"RM-009", name:"Labels (Printed)", unit:"pcs", minStock:100, vendor:"", entries:[] },
-  { id:"rm-010", code:"RM-010", name:"DI Water", unit:"mL", minStock:50000, vendor:"", entries:[] },
+  { id:"rm-001", code:"RM-001", name:"Sulfuric Acid (Analytical Grade)", unit:"mL", minStock:200, vendor:"Sigma", entries:[] },
+  { id:"rm-002", code:"RM-002", name:"DPD Sulfate P.A", unit:"g", minStock:1500, vendor:"Sigma", entries:[] },
+  { id:"rm-003", code:"RM-003", name:"Boric Acid", unit:"g", minStock:1000, vendor:"Sigma/Synth", entries:[] },
+  { id:"rm-004", code:"RM-004", name:"Disodium EDTA P.A", unit:"g", minStock:500, vendor:"Sigma/Synth/Cromato/Neon", entries:[] },
+  { id:"rm-005", code:"RM-005", name:"KH2PO4 (Monopotassium Phosphate P.A ACS)", unit:"g", minStock:5000, vendor:"Sigma/Synth/Cromato/Neon", entries:[] },
+  { id:"rm-006", code:"RM-006", name:"Na2HPO4 (Anhydrous Sodium Phosphate P.A ACS)", unit:"g", minStock:3000, vendor:"Sigma/Synth/Cromato", entries:[] },
+  { id:"rm-007", code:"RM-007", name:"Bottles 500mL (16oz)", unit:"pcs", minStock:200, vendor:"", entries:[] },
+  { id:"rm-008", code:"RM-008", name:"Dark Ziplock Bag", unit:"pcs", minStock:100, vendor:"", entries:[] },
+  { id:"rm-009", code:"RM-009", name:"Labels (Printed)", unit:"pcs", minStock:200, vendor:"", entries:[] },
+  { id:"rm-010", code:"RM-010", name:"DI Water (Type I Ultrapure)", unit:"mL", minStock:50000, vendor:"", entries:[] },
   { id:"rm-011", code:"RM-011", name:"Ceramic Spheres", unit:"pcs", minStock:20, vendor:"", entries:[] },
   { id:"rm-012", code:"RM-012", name:"PVC Film Roll", unit:"pcs", minStock:10, vendor:"", entries:[] },
   { id:"rm-013", code:"RM-013", name:"Potassium Iodide P.A (KI)", unit:"g", minStock:500, vendor:"Synth", entries:[] },
+  { id:"rm-014", code:"RM-014", name:"Hach Powder Pillows (Free Chlorine DPD 10mL)", unit:"pcs", minStock:50, vendor:"Hach", entries:[] },
+  { id:"rm-015", code:"RM-015", name:"Chlorine Standard 1000 mg/L (ISOGUIDE)", unit:"mL", minStock:500, vendor:"ISOGUIDE", entries:[] },
+  { id:"rm-016", code:"RM-016", name:"pH Buffer Solution 4.0", unit:"mL", minStock:500, vendor:"", entries:[] },
+  { id:"rm-017", code:"RM-017", name:"pH Buffer Solution 7.0", unit:"mL", minStock:500, vendor:"", entries:[] },
+  { id:"rm-018", code:"RM-018", name:"pH Buffer Solution 10.0", unit:"mL", minStock:500, vendor:"", entries:[] },
+  { id:"rm-019", code:"RM-019", name:"Dropper Bottles (60mL)", unit:"pcs", minStock:100, vendor:"", entries:[] },
+  { id:"rm-020", code:"RM-020", name:"Plastic Container with Cap (for DPD mixing)", unit:"pcs", minStock:20, vendor:"", entries:[] },
 ];
 
 const DEF_QC = {
@@ -315,9 +321,18 @@ DEF_BOM["pow-cl-ultra"] = [
 DEF_BOM["pow-cl-aws"] = DEF_BOM["pow-cl-ultra"];
 DEF_BOM["pow-cl-pol"] = DEF_BOM["pow-cl-ultra"];
 
-/* ── STORAGE (API) ── */
-async function loadAll() { try { const d = await apiLoadData(); return d && Object.keys(d).length > 1 ? d : null; } catch { return null; } }
-async function saveAll(data) { try { await apiSaveData(data); } catch(e) { console.error("Save:",e); } }
+/* ── STORAGE (single key for speed) ── */
+const STORE_KEY = "pc-data-v2";
+async function stGet(k) { try { const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; } catch { return null; } }
+async function stSet(k, v) { try { await window.storage.set(k, JSON.stringify(v)); } catch {} }
+async function loadAll() {
+  const cached = await stGet(STORE_KEY);
+  if (cached && cached._ver === 2) return cached;
+  return null;
+}
+async function saveAll(data) {
+  await stSet(STORE_KEY, { ...data, _ver: 2 });
+}
 
 /* Helper: get componentKey from product (handles old products without it) */
 function getCompKey(p) {
@@ -484,19 +499,8 @@ function PhotoBox({ images=[], onChange, canEdit=true }) {
 
 /* ══════════ MAIN APP ══════════ */
 export default function App() {
-  const [authState, setAuthState] = useState(getToken() ? "checking" : "login");
-  const [user, setUser] = useState(null);
-  const [lf, setLf] = useState({ username: "", password: "" });
-  const [le, setLe] = useState("");
-  useEffect(() => { if (authState==="checking") getMe().then(r=>{setUser(r.user);setAuthState("ok")}).catch(()=>{setToken("");setAuthState("login")}); }, [authState]);
-  const doLogin = async () => { setLe(""); try { const u = await apiLogin(lf.username, lf.password); setUser(u); setAuthState("ok"); } catch(e) { setLe(e.message||"Invalid credentials"); } };
-  const doLogout = async () => { await apiLogout(); setUser(null); setAuthState("login"); };
-  if (authState==="login") return (<div style={{minHeight:"100vh",background:K.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:K.cd,borderRadius:16,padding:40,width:360,boxShadow:"0 4px 24px rgba(0,0,0,0.08)",border:`1px solid ${K.bd}`}}><div style={{textAlign:"center",marginBottom:28}}><PolicontrolLogo size={56}/><h1 style={{fontSize:22,fontWeight:700,color:K.pri,margin:"12px 0 4px"}}>POLICONTROL USA</h1><p style={{fontSize:13,color:K.txM,margin:0}}>Manufacturing ERP</p></div>{le&&<div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#991b1b",marginBottom:12}}>{le}</div>}<div style={{marginBottom:12}}><label style={sl_}>Username</label><input value={lf.username} onChange={e=>setLf({...lf,username:e.target.value})} onKeyDown={e=>e.key==="Enter"&&doLogin()} style={{...si_,width:"100%",boxSizing:"border-box"}} autoFocus/></div><div style={{marginBottom:20}}><label style={sl_}>Password</label><input type="password" value={lf.password} onChange={e=>setLf({...lf,password:e.target.value})} onKeyDown={e=>e.key==="Enter"&&doLogin()} style={{...si_,width:"100%",boxSizing:"border-box"}}/></div><button onClick={doLogin} style={{...sb_,width:"100%",padding:"12px",fontSize:15}}>Sign In</button></div></div>);
-  if (authState==="checking"||!user) return (<div style={{minHeight:"100vh",background:K.bg,display:"flex",alignItems:"center",justifyContent:"center"}}><PolicontrolLogo size={64}/></div>);
-  return <MainApp user={user} onLogout={doLogout}/>;
-}
-function MainApp({ user, onLogout }) {
   const [loading, setLoading] = useState(true);
+  const user = { username:"admin", name:"Admin", role:"admin" };
   const [S, setS] = useState({});
   const [nav, setNav] = useState({ v:"dashboard", prod:null, comp:null, proc:null, si:0, edit:false, sub:null });
   const [sidebar, setSidebar] = useState(false);
@@ -524,6 +528,22 @@ function MainApp({ user, onLogout }) {
       if (!(s.rawMaterials||[]).find(r => r.id === "rm-013")) {
         s.rawMaterials = [...s.rawMaterials, { id:"rm-013", code:"RM-013", name:"Potassium Iodide P.A (KI)", unit:"g", minStock:500, vendor:"Synth", entries:[] }];
       }
+      // Add QC consumables and other missing materials
+      const newMats = [
+        { id:"rm-014", code:"RM-014", name:"Hach Powder Pillows (Free Chlorine DPD 10mL)", unit:"pcs", minStock:50, vendor:"Hach", entries:[] },
+        { id:"rm-015", code:"RM-015", name:"Chlorine Standard 1000 mg/L (ISOGUIDE)", unit:"mL", minStock:500, vendor:"ISOGUIDE", entries:[] },
+        { id:"rm-016", code:"RM-016", name:"pH Buffer Solution 4.0", unit:"mL", minStock:500, vendor:"", entries:[] },
+        { id:"rm-017", code:"RM-017", name:"pH Buffer Solution 7.0", unit:"mL", minStock:500, vendor:"", entries:[] },
+        { id:"rm-018", code:"RM-018", name:"pH Buffer Solution 10.0", unit:"mL", minStock:500, vendor:"", entries:[] },
+        { id:"rm-019", code:"RM-019", name:"Dropper Bottles (60mL)", unit:"pcs", minStock:100, vendor:"", entries:[] },
+        { id:"rm-020", code:"RM-020", name:"Plastic Container with Cap (for DPD mixing)", unit:"pcs", minStock:20, vendor:"", entries:[] },
+      ];
+      for (const nm of newMats) {
+        if (!(s.rawMaterials||[]).find(r => r.id === nm.id)) s.rawMaterials = [...s.rawMaterials, nm];
+      }
+      // Update vendor info on existing materials if blank
+      const vendorMap = {"rm-001":"Sigma","rm-002":"Sigma","rm-003":"Sigma/Synth","rm-004":"Sigma/Synth/Cromato/Neon","rm-005":"Sigma/Synth/Cromato/Neon","rm-006":"Sigma/Synth/Cromato"};
+      s.rawMaterials = s.rawMaterials.map(r => (vendorMap[r.id] && !r.vendor) ? {...r, vendor:vendorMap[r.id]} : r);
       // Add pow-cl BOM if missing
       if (!s.bom["pow-cl-ultra"]?.length) {
         s.bom["pow-cl-ultra"] = DEF_BOM["pow-cl-ultra"];
@@ -650,8 +670,8 @@ function MainApp({ user, onLogout }) {
             {m.badge>0&&<span style={{position:"absolute",top:4,right:sidebar?8:4,minWidth:18,height:18,borderRadius:9,background:K.er,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{m.badge>9?"9+":m.badge}</span>}
           </div>))}
         </div>
-        <div style={{padding:10,borderTop:`1px solid ${K.bd}`,display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={onLogout} title="Logout">
-          <span style={{fontSize:17,flexShrink:0}}>👤</span>{sidebar&&<><span style={{fontSize:12,color:K.txM,flex:1}}>{user.name}</span><span style={{fontSize:10,color:K.txD}}>↪</span></>}
+        <div style={{padding:10,borderTop:`1px solid ${K.bd}`,display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:17,flexShrink:0}}>👤</span>{sidebar&&<span style={{fontSize:12,color:K.txM}}>{user.name}</span>}
         </div>
       </div>
 
@@ -1269,6 +1289,86 @@ function SlidesView({ p, compId, procId, steps, si, setSi, edit, setEdit, S, sv,
   );
 }
 
+/* ── Factory Location Photos ── */
+function FactoryPhotos({ photos, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [local, setLocal] = useState(photos);
+  const [expanded, setExpanded] = useState(null);
+  const MAX = 6;
+
+  useEffect(() => setLocal(photos), [photos]);
+
+  const addPhoto = (e) => {
+    const file = e.target.files[0]; if (!file || local.length >= MAX) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        const maxW = 800;
+        c.width = Math.min(img.width, maxW); c.height = img.height * (c.width / img.width);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        setLocal([...local, { src: c.toDataURL("image/jpeg", 0.85), caption: "" }]);
+      }; img.src = ev.target.result;
+    }; reader.readAsDataURL(file); e.target.value = "";
+  };
+
+  if (!editing && local.length === 0) return (
+    <div style={{marginBottom:20,textAlign:"center",padding:"20px",background:K.cd,borderRadius:12,border:`2px dashed ${K.bd}`}}>
+      <span style={{fontSize:28}}>📷</span>
+      <div style={{fontSize:13,color:K.txM,margin:"8px 0"}}>Add photos of your factory locations to help operators find equipment</div>
+      <button onClick={()=>setEditing(true)} style={{...so_,fontSize:12}}>+ Add Location Photos</button>
+    </div>
+  );
+
+  return (
+    <div style={{marginBottom:24}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontSize:14,fontWeight:700,color:K.tx}}>📷 Factory Location Photos</div>
+        <button onClick={()=>{if(editing){onSave(local);setEditing(false)}else setEditing(true)}} style={{...so_,fontSize:12}}>
+          {editing ? "💾 Save Photos" : "✏️ Edit"}
+        </button>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
+        {local.map((p, i) => (
+          <div key={i} style={{position:"relative",borderRadius:10,overflow:"hidden",border:`1px solid ${K.bd}`,background:K.cd,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+            <img src={p.src} alt="" onClick={()=>setExpanded(expanded===i?null:i)} style={{width:"100%",height:130,objectFit:"cover",cursor:"pointer",display:"block"}} />
+            {editing ? (
+              <div style={{padding:"6px 8px"}}>
+                <input value={p.caption} onChange={e=>{const n=[...local];n[i]={...n[i],caption:e.target.value};setLocal(n)}} placeholder="Caption (e.g. Main Blue Bench)" style={{...si_,width:"100%",boxSizing:"border-box",fontSize:11}} />
+                <button onClick={()=>setLocal(local.filter((_,j)=>j!==i))} style={{...sm_,color:K.er,fontSize:10,marginTop:4,width:"100%"}}>🗑️ Remove</button>
+              </div>
+            ) : (
+              p.caption && <div style={{padding:"6px 8px",fontSize:11,color:K.txM,fontWeight:600}}>{p.caption}</div>
+            )}
+          </div>
+        ))}
+
+        {editing && local.length < MAX && (
+          <label style={{borderRadius:10,border:`2px dashed ${K.bd}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,minHeight:130,cursor:"pointer",color:K.txM,fontSize:12}}>
+            <span style={{fontSize:24}}>📷</span>
+            <span>+ Add Photo</span>
+            <span style={{fontSize:10}}>({local.length}/{MAX})</span>
+            <input type="file" accept="image/*" onChange={addPhoto} style={{display:"none"}} />
+          </label>
+        )}
+      </div>
+
+      {/* Expanded photo */}
+      {expanded !== null && local[expanded] && (
+        <div onClick={()=>setExpanded(null)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:20}}>
+          <div style={{maxWidth:"90vw",maxHeight:"90vh",position:"relative"}} onClick={e=>e.stopPropagation()}>
+            <img src={local[expanded].src} alt="" style={{maxWidth:"90vw",maxHeight:"85vh",borderRadius:8,objectFit:"contain"}} />
+            {local[expanded].caption && <div style={{textAlign:"center",color:"#fff",fontSize:16,fontWeight:600,marginTop:10}}>{local[expanded].caption}</div>}
+            <button onClick={()=>setExpanded(null)} style={{position:"absolute",top:-12,right:-12,width:32,height:32,borderRadius:16,background:"#fff",border:"none",fontSize:16,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}}>✕</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Equipment Map ── */
 function EquipmentView({ S, sv, aLog }) {
   const [showAdd, setShowAdd] = useState(false);
@@ -1356,6 +1456,10 @@ function EquipmentView({ S, sv, aLog }) {
 
   return (
     <PW title="Equipment & Materials Map" sub="Find where everything is located — changes auto-update all instructions">
+
+      {/* ── FACTORY LOCATION PHOTOS ── */}
+      <FactoryPhotos photos={S.equipmentPhotos||[]} onSave={async(p)=>{await sv("equipmentPhotos",p);await aLog("Updated factory photos",""+p.length+" photos")}} />
+
       <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
         <input placeholder="Search equipment..." value={search} onChange={e=>setSearch(e.target.value)} style={{...si_,flex:1,minWidth:200}} />
         <select value={filterLoc} onChange={e=>setFilterLoc(e.target.value)} style={ss_}><option value="all">All Locations</option>{locations.map(l=><option key={l}>{l}</option>)}</select>
@@ -1889,19 +1993,48 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
       if(!val) return "";
       return `<div style="position:absolute;left:${f.x}%;top:${f.y}%;transform:translate(-50%,-50%);font-size:${f.fontSize}pt;font-weight:${f.fontWeight};color:${f.color};white-space:nowrap;">${val}</div>`;
     }).join("");
-    const html = `<!DOCTYPE html><html><head><style>@page{size:${W}in ${H}in;margin:0}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif}.label{width:${W}in;height:${H}in;position:relative;page-break-after:always;overflow:hidden}.label img{width:100%;height:100%;object-fit:contain}</style></head><body>${Array(qty).fill(0).map(()=>`<div class="label">${bgImg?`<img src="${bgImg}"/>`:""} ${ov}</div>`).join("")}</body></html>`;
 
-    // Try window.open first, fallback to iframe
-    const win = window.open("","_blank");
+    const html = `<!DOCTYPE html><html><head>
+<style>
+  @page { size: ${W}in ${H}in; margin: 0; }
+  @media print { @page { size: ${W}in ${H}in; margin: 0; } body { margin: 0; } }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:Arial,sans-serif; width:${W}in; }
+  .label { width:${W}in; height:${H}in; position:relative; page-break-after:always; overflow:hidden; }
+  .label img { width:100%; height:100%; object-fit:fill; display:block; }
+</style>
+</head><body>
+${Array(qty).fill(0).map(()=>
+  `<div class="label">${bgImg ? `<img src="${bgImg}" />` : '<div style="width:100%;height:100%;border:0.5px solid #ccc"></div>'}${ov}</div>`
+).join("\n")}
+<script>
+  // Wait for all images to load before printing
+  var imgs = document.querySelectorAll('img');
+  var loaded = 0;
+  var total = imgs.length;
+  function checkPrint() {
+    loaded++;
+    if (loaded >= total) {
+      setTimeout(function() { window.print(); }, 200);
+    }
+  }
+  if (total === 0) { setTimeout(function() { window.print(); }, 200); }
+  else { for (var i = 0; i < imgs.length; i++) { imgs[i].onload = checkPrint; imgs[i].onerror = checkPrint; if (imgs[i].complete) checkPrint(); } }
+</script>
+</body></html>`;
+
+    // Open in new window — print dialog will appear with correct page size
+    const win = window.open("", "_blank", "width=700,height=500");
     if (win) {
-      win.document.write(html); win.document.close();
-      setTimeout(() => win.print(), 400);
+      win.document.write(html);
+      win.document.close();
     } else {
-      // Sandbox blocks popups — use iframe
-      let frame = printFrameRef.current;
-      if (!frame) { frame = document.createElement("iframe"); frame.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;"; document.body.appendChild(frame); printFrameRef.current = frame; }
-      frame.contentDocument.open(); frame.contentDocument.write(html); frame.contentDocument.close();
-      setTimeout(() => { try { frame.contentWindow.print(); } catch { /* download fallback */ const blob = new Blob([html],{type:"text/html"}); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `label_${size}.html`; a.click(); } }, 400);
+      // Fallback: download as HTML file — user opens in Chrome and prints
+      const blob = new Blob([html], {type:"text/html"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `label_${p.brand}_${lotText||"batch"}_${size}.html`;
+      a.click();
     }
     aLog("Printed labels", `${p.brand} ${lotText} ${qty}x ${size}`);
   };
@@ -2040,12 +2173,16 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
             {/* Right: Tips */}
             <div style={{width:220,flexShrink:0}}>
               <div style={{background:K.hv,borderRadius:10,padding:14,fontSize:11,color:K.txM,lineHeight:1.7}}>
-                <div style={{fontWeight:700,color:K.tx,fontSize:13,marginBottom:6}}>Epson CW-C4000</div>
+                <div style={{fontWeight:700,color:K.tx,fontSize:13,marginBottom:6}}>🖨️ Epson CW-C4000</div>
                 • Label: <strong>{p.brand}</strong><br/>
                 • Size: <strong>{labelSize.name}</strong> (auto)<br/>
-                • Media type: <strong>Labels</strong><br/>
-                • No Windows config needed!<br/><br/>
-                <strong>First time?</strong> Upload your blank label, click "⚙️ Position" to place LOT/EXP fields, save.
+                • Media type: <strong>Labels</strong><br/><br/>
+                <strong>⚡ One-click setup (do once):</strong><br/>
+                1. Set Epson CW-C4000 as <strong>default printer</strong> in Windows<br/>
+                2. In Chrome print dialog, select Epson<br/>
+                3. Set paper size to match label<br/>
+                4. Chrome remembers these settings!<br/><br/>
+                <strong>First time?</strong> Upload blank label, click "⚙️ Position" to place LOT/EXP, save.
               </div>
             </div>
           </div>
@@ -2080,6 +2217,221 @@ function AuditView({ log }) {
   return (<PW title="History">{!(log||[]).length?<div style={{textAlign:"center",padding:40,color:K.txD}}>No changes</div>:log.map((e,i)=><div key={i} style={{background:K.cd,borderRadius:10,padding:"10px 14px",border:`1px solid ${K.bd}`,marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,color:K.tx}}><strong>{e.user}</strong> — {e.action}</div><div style={{fontSize:12,color:K.txM}}>{e.details}</div></div><div style={{fontSize:11,color:K.txD,whiteSpace:"nowrap",marginLeft:16}}>{new Date(e.ts).toLocaleString("en-US")}</div></div>)}</PW>);
 }
 
+/* ── AI Import (paste IT document → auto-create kit/product/instructions) ── */
+function AIImport({ S, sv, aLog, allCats, allKits, allBrands }) {
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const doImport = async () => {
+    if (!input.trim()) return;
+    setLoading(true); setError(""); setResult(null); setSaved(false);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4000,
+          messages: [{ role: "user", content: `You are a manufacturing ERP assistant for Policontrol USA, a factory that produces DPD chlorine reagents and microbiology test products.
+
+Parse the following work instruction document (may be in Portuguese or English) and extract ALL information into a structured JSON format.
+
+RESPOND WITH ONLY VALID JSON, no markdown, no backticks, no explanation. The JSON must have this exact structure:
+
+{
+  "kitName": "Name of the kit/product in English",
+  "kitId": "short-slug-id",
+  "category": "dpd-reagents or micro-kits or micro-trays",
+  "format": "Liquid or Powder or Kit or Tray",
+  "type": "Free Chlorine or Total Chlorine or etc",
+  "components": [
+    {
+      "id": "short-slug",
+      "name": "Component Name in English",
+      "icon": "emoji",
+      "desc": "Short description with batch size"
+    }
+  ],
+  "rawMaterials": [
+    {
+      "code": "RM-XXX",
+      "name": "Material name in English",
+      "unit": "g or mL or pcs",
+      "vendor": "Vendor name or empty",
+      "qtyPerBatch": 100.0,
+      "component": "Which component uses this"
+    }
+  ],
+  "instructions": {
+    "component-id": [
+      {
+        "title": "1. Step Title",
+        "description": "Detailed step description in English with location markers like 📍",
+        "warning": "Warning text or empty",
+        "notes": "Tips or empty"
+      }
+    ]
+  },
+  "batchSize": "e.g. 49 kits",
+  "bottleWeight": "e.g. 102g per bottle",
+  "tolerance": "e.g. ±2%",
+  "expiration": "e.g. 60 months"
+}
+
+Include ALL raw materials, ALL steps, ALL warnings. Translate everything to English. Include equipment list in step 1 with PPE. Add location markers (📍) where relevant.
+
+DOCUMENT TO PARSE:
+${input}` }],
+        }),
+      });
+      const data = await res.json();
+      const text = data.content?.map(c => c.text || "").join("") || "";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      setResult(parsed);
+    } catch (e) {
+      setError("Error processing: " + (e.message || "Failed to parse response. Try pasting a clearer document."));
+    }
+    setLoading(false);
+  };
+
+  const doSave = async () => {
+    if (!result) return;
+    const r = result;
+
+    // 1. Add kit type if not exists
+    const ck = r.kitId;
+    if (!allKits[ck]) {
+      const newKit = { name: r.kitName, type: r.type, format: r.format, category: r.category, items: r.components };
+      await sv("customKits", { ...(S.customKits||{}), [ck]: newKit });
+    }
+
+    // 2. Add products for each brand
+    const existing = S.products.map(p => p.id);
+    const newProducts = [...S.products];
+    for (const brand of ["Ultra", "AWS", "Policontrol"]) {
+      const pid = ck + "-" + brand.toLowerCase();
+      if (!existing.includes(pid)) {
+        newProducts.push({
+          id: pid, name: r.kitName, brand, format: r.format, type: r.type,
+          category: r.category, emoji: r.format === "Liquid" ? "🧪" : "⚗️", componentKey: ck,
+        });
+      }
+    }
+    await sv("products", newProducts);
+
+    // 3. Add raw materials if not exists
+    const mats = [...(S.rawMaterials||[])];
+    const existingCodes = mats.map(m => m.code);
+    for (const rm of (r.rawMaterials||[])) {
+      if (!existingCodes.includes(rm.code)) {
+        mats.push({ id: "rm-" + Date.now() + Math.random().toString(36).slice(2,5), code: rm.code, name: rm.name, unit: rm.unit, vendor: rm.vendor || "", minStock: 0, entries: [] });
+      }
+    }
+    await sv("rawMaterials", mats);
+
+    // 4. Add instructions for all brands
+    const instr = { ...S.instructions };
+    for (const brand of ["Ultra", "AWS", "Policontrol"]) {
+      const pid = ck + "-" + brand.toLowerCase();
+      for (const [compId, steps] of Object.entries(r.instructions||{})) {
+        const key = pid + "__" + compId;
+        if (!instr[key]?.length) {
+          instr[key] = steps.map(s => ({ ...s, observations: "", images: [] }));
+        }
+      }
+    }
+    await sv("instructions", instr);
+
+    await aLog("AI Import", r.kitName + " — " + (r.components||[]).length + " components, " + (r.rawMaterials||[]).length + " materials");
+    setSaved(true);
+  };
+
+  return (
+    <div>
+      <div style={{fontSize:15,fontWeight:700,color:K.tx,marginBottom:6}}>🤖 AI Import — Paste Work Instruction</div>
+      <div style={{fontSize:13,color:K.txM,marginBottom:16}}>Paste any IT document (Portuguese or English). AI will automatically create the kit, products, raw materials, instructions, and BOM for all 3 brands.</div>
+
+      <textarea value={input} onChange={e=>setInput(e.target.value)} rows={12} placeholder={"Cole aqui o procedimento de trabalho (IT)...\n\nExemplo:\n- IT de produção de reagente DPD\n- Procedimento de preparo de tampão\n- Instrução de controle de qualidade\n\nPode ser em português ou inglês. A IA traduz e organiza tudo automaticamente."} style={{...si_,width:"100%",boxSizing:"border-box",fontSize:13,fontFamily:"monospace",resize:"vertical",lineHeight:1.5}} />
+
+      <div style={{display:"flex",gap:10,marginTop:12}}>
+        <button onClick={doImport} disabled={loading||!input.trim()} style={{...sb_,padding:"12px 28px",fontSize:14,opacity:loading||!input.trim()?0.5:1}}>
+          {loading ? "🔄 Processing..." : "🤖 Import with AI"}
+        </button>
+        {input && <button onClick={()=>{setInput("");setResult(null);setError("");setSaved(false)}} style={{...so_,fontSize:13}}>Clear</button>}
+      </div>
+
+      {error && <Ab type="err" icon="❌">{error}</Ab>}
+
+      {result && (
+        <div style={{marginTop:20}}>
+          <div style={{background:K.cd,borderRadius:12,border:`1px solid ${K.ok}44`,padding:20}}>
+            <div style={{fontSize:16,fontWeight:700,color:K.tx,marginBottom:12}}>✅ Parsed Successfully</div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
+              <div style={{background:K.hv,borderRadius:8,padding:12}}>
+                <div style={{fontSize:11,color:K.txD,textTransform:"uppercase"}}>Kit Name</div>
+                <div style={{fontSize:14,fontWeight:600,color:K.tx}}>{result.kitName}</div>
+                <div style={{fontSize:12,color:K.txM}}>{result.format} • {result.type}</div>
+              </div>
+              <div style={{background:K.hv,borderRadius:8,padding:12}}>
+                <div style={{fontSize:11,color:K.txD,textTransform:"uppercase"}}>Batch Size</div>
+                <div style={{fontSize:14,fontWeight:600,color:K.tx}}>{result.batchSize || "—"}</div>
+                <div style={{fontSize:12,color:K.txM}}>{result.bottleWeight} {result.tolerance ? `(${result.tolerance})` : ""}</div>
+              </div>
+              <div style={{background:K.hv,borderRadius:8,padding:12}}>
+                <div style={{fontSize:11,color:K.txD,textTransform:"uppercase"}}>Expiration</div>
+                <div style={{fontSize:14,fontWeight:600,color:K.tx}}>{result.expiration || "—"}</div>
+              </div>
+            </div>
+
+            <div style={{fontSize:13,fontWeight:600,color:K.tx,marginBottom:8}}>Components ({(result.components||[]).length})</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+              {(result.components||[]).map((c,i) => (
+                <div key={i} style={{background:K.hv,borderRadius:8,padding:"8px 14px",display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:18}}>{c.icon}</span>
+                  <div><div style={{fontSize:13,fontWeight:600}}>{c.name}</div><div style={{fontSize:11,color:K.txM}}>{c.desc}</div></div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{fontSize:13,fontWeight:600,color:K.tx,marginBottom:8}}>Raw Materials ({(result.rawMaterials||[]).length})</div>
+            <div style={{fontSize:12,marginBottom:16}}>
+              {(result.rawMaterials||[]).map((rm,i) => (
+                <div key={i} style={{padding:"4px 0",borderTop:i?`1px solid ${K.bd}`:"none",display:"flex",justifyContent:"space-between"}}>
+                  <span><strong>{rm.code}</strong> — {rm.name}</span>
+                  <span style={{color:K.txM}}>{rm.qtyPerBatch} {rm.unit} / batch{rm.vendor ? ` (${rm.vendor})` : ""}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{fontSize:13,fontWeight:600,color:K.tx,marginBottom:8}}>Instructions</div>
+            {Object.entries(result.instructions||{}).map(([compId, steps]) => (
+              <div key={compId} style={{marginBottom:10}}>
+                <div style={{fontSize:12,fontWeight:600,color:K.pri,marginBottom:4}}>{compId} — {(steps||[]).length} steps</div>
+                {(steps||[]).map((s,i) => (
+                  <div key={i} style={{fontSize:11,color:K.txM,padding:"2px 0 2px 12px"}}>{s.title}</div>
+                ))}
+              </div>
+            ))}
+
+            <div style={{display:"flex",gap:10,marginTop:16}}>
+              {!saved ? (
+                <button onClick={doSave} style={{...sb_,padding:"12px 28px",fontSize:14}}>💾 Save to App (all 3 brands)</button>
+              ) : (
+                <div style={{display:"flex",alignItems:"center",gap:8,color:K.ok,fontWeight:600,fontSize:14}}>✅ Saved! Kit, products, materials, and instructions created for Ultra, AWS, and Policontrol.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsView({ S, sv, aLog }) {
   const [tab, setTab] = useState("products");
 
@@ -2104,7 +2456,7 @@ function SettingsView({ S, sv, aLog }) {
     <PW title="Settings" sub="Manage products, categories, brands, and kit types">
       {/* Tabs */}
       <div style={{display:"flex",gap:4,marginBottom:20}}>
-        {[["products","📋 Products"],["categories","🏷️ Categories"],["brands","🏢 Brands"],["kits","🧪 Kit Types"]].map(([id,lbl])=>(
+        {[["products","📋 Products"],["categories","🏷️ Categories"],["brands","🏢 Brands"],["kits","🧪 Kit Types"],["ai","🤖 AI Import"]].map(([id,lbl])=>(
           <button key={id} onClick={()=>setTab(id)} style={{...so_,background:tab===id?K.hv:"transparent",color:tab===id?K.pri:K.txM,borderColor:tab===id?K.pri:K.bd,fontSize:13,padding:"8px 16px",fontWeight:tab===id?600:400}}>{lbl}</button>
         ))}
       </div>
@@ -2259,6 +2611,9 @@ function SettingsView({ S, sv, aLog }) {
           </div>
         )})}
       </>}
+
+      {/* ── AI IMPORT ── */}
+      {tab==="ai" && <AIImport S={S} sv={sv} aLog={aLog} allCats={allCats} allKits={allKits} allBrands={allBrands} />}
     </PW>
   );
 }
