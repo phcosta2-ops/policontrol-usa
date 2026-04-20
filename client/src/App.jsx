@@ -2154,21 +2154,24 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
   const handlePrint = async () => {
     const bgImg = tpl?.imageData || null;
     if (!bgImg) { setPrintStatus("❌ No template uploaded"); return; }
-    setPrintStatus("⏳ Generating PDF...");
-    try {
-      // Load pdf-lib from CDN
-      if (!window.PDFLib) {
-        await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
-      }
-      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
 
-      if (bgImg.startsWith("data:application/pdf")) {
-        // PDF template — edit the original PDF directly (perfect proportions)
+    if (bgImg.startsWith("data:application/pdf")) {
+      // PDF template — download with LOT/EXP overlay using pdf-lib
+      setPrintStatus("⏳ Generating PDF...");
+      try {
+        if (!window.PDFLib) {
+          await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+        }
+        const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
         const raw = atob(bgImg.split(",")[1]);
         const arr = new Uint8Array(raw.length);
         for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
 
+        // Load and copy original PDF
         const srcDoc = await PDFDocument.load(arr);
+        const srcPage = srcDoc.getPage(0);
+        const { width: pw, height: ph } = srcPage.getSize();
+
         const outDoc = await PDFDocument.create();
         const font = await outDoc.embedFont(StandardFonts.Helvetica);
         const fontBold = await outDoc.embedFont(StandardFonts.HelveticaBold);
@@ -2176,60 +2179,42 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
         for (let i = 0; i < qty; i++) {
           const [copied] = await outDoc.copyPages(srcDoc, [0]);
           outDoc.addPage(copied);
-          const pg = outDoc.getPages()[i];
-          const { width: pw, height: ph } = pg.getSize();
+          const pg = outDoc.getPage(i);
 
+          // Draw LOT/EXP overlay
           overlayFields.forEach(f => {
             const val = f.id === "lot" ? (lotText ? "LOT: " + lotText : "") : (expText ? "EXP: " + expText : "");
             if (!val) return;
-            const x = (f.x / 100) * pw;
-            const y = ph - (f.y / 100) * ph;
-            pg.drawText(val, {
-              x: x - (val.length * f.fontSize * 0.3),
-              y: y - f.fontSize * 0.4,
-              size: f.fontSize,
-              font: f.fontWeight === "bold" ? fontBold : font,
-              color: rgb(0, 0, 0),
-            });
+            const fnt = f.fontWeight === "bold" ? fontBold : font;
+            const sz = f.fontSize || 12;
+            const tw = fnt.widthOfTextAtSize(val, sz);
+            const x = (f.x / 100) * pw - tw / 2;
+            const y = ph - (f.y / 100) * ph - sz / 2;
+            pg.drawText(val, { x, y, size: sz, font: fnt, color: rgb(0, 0, 0) });
           });
         }
 
         const pdfBytes = await outDoc.save();
         const blob = new Blob([pdfBytes], { type: "application/pdf" });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a"); a.href = url;
+        const a = document.createElement("a");
+        a.href = url;
         a.download = "label_" + p.brand + "_" + (lotText || "batch") + ".pdf";
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 3000);
-
-      } else {
-        // Image template — create new PDF with image
-        if (!window.jspdf) {
-          await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
-        }
-        const { jsPDF } = window.jspdf;
-        const W = labelSize.w, H = labelSize.h;
-        const doc = new jsPDF({ orientation: W > H ? "l" : "p", unit: "in", format: [W, H] });
-        for (let i = 0; i < qty; i++) {
-          if (i > 0) doc.addPage([W, H], W > H ? "l" : "p");
-          doc.addImage(bgImg, "PNG", 0, 0, W, H);
-          overlayFields.forEach(f => {
-            const val = f.id === "lot" ? (lotText ? "LOT: " + lotText : "") : (expText ? "EXP: " + expText : "");
-            if (!val) return;
-            doc.setFontSize(f.fontSize);
-            doc.setFont("helvetica", f.fontWeight === "bold" ? "bold" : "normal");
-            doc.setTextColor(0);
-            doc.text(val, (f.x / 100) * W, (f.y / 100) * H, { align: "center" });
-          });
-        }
-        doc.save("label_" + p.brand + "_" + (lotText || "batch") + ".pdf");
+        setPrintStatus("✅ PDF (" + Math.round(pw) + "x" + Math.round(ph) + "pt) — Open and Ctrl+P to print.");
+      } catch(e) {
+        setPrintStatus("❌ Error: " + e.message);
       }
-
-      setPrintStatus("✅ PDF downloaded! Open and Ctrl+P to print.");
-      aLog("Label PDF", p.brand + " " + (lotText || "") + " " + qty + "x " + size);
-    } catch(e) {
-      setPrintStatus("❌ Error: " + e.message);
+    } else {
+      // Image template — just download as image
+      const a = document.createElement("a");
+      a.href = bgImg;
+      a.download = "label_" + p.brand + "_" + (lotText || "batch") + ".png";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setPrintStatus("✅ Image downloaded.");
     }
+    aLog("Label", p.brand + " " + (lotText || "") + " " + qty + "x " + size);
   };
 
   const PXI = 80;
