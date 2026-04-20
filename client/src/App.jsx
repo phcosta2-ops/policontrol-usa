@@ -2170,16 +2170,27 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
         // Load and copy original PDF
         const srcDoc = await PDFDocument.load(arr);
         const srcPage = srcDoc.getPage(0);
-        const { width: pw, height: ph } = srcPage.getSize();
+        const { width: srcW, height: srcH } = srcPage.getSize();
+
+        // Target size: exact label dimensions in PDF points (72 pts/inch)
+        const tgtW = W * 72;
+        const tgtH = H * 72;
 
         const outDoc = await PDFDocument.create();
         const font = await outDoc.embedFont(StandardFonts.Helvetica);
         const fontBold = await outDoc.embedFont(StandardFonts.HelveticaBold);
 
         for (let i = 0; i < qty; i++) {
-          const [copied] = await outDoc.copyPages(srcDoc, [0]);
-          outDoc.addPage(copied);
-          const pg = outDoc.getPage(i);
+          // Create page with exact label size
+          const pg = outDoc.addPage([tgtW, tgtH]);
+
+          // Embed the source PDF page as image (XObject)
+          const [embeddedPage] = await outDoc.embedPdf(srcDoc, [0]);
+
+          // Scale source to fit target exactly
+          const scaleX = tgtW / embeddedPage.width;
+          const scaleY = tgtH / embeddedPage.height;
+          pg.drawPage(embeddedPage, { x: 0, y: 0, xScale: scaleX, yScale: scaleY });
 
           // Draw LOT/EXP overlay
           overlayFields.forEach(f => {
@@ -2188,8 +2199,8 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
             const fnt = f.fontWeight === "bold" ? fontBold : font;
             const sz = f.fontSize || 12;
             const tw = fnt.widthOfTextAtSize(val, sz);
-            const x = (f.x / 100) * pw - tw / 2;
-            const y = ph - (f.y / 100) * ph - sz / 2;
+            const x = (f.x / 100) * tgtW - tw / 2;
+            const y = tgtH - (f.y / 100) * tgtH - sz / 2;
             pg.drawText(val, { x, y, size: sz, font: fnt, color: rgb(0, 0, 0) });
           });
         }
@@ -2202,7 +2213,7 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
         a.download = "label_" + p.brand + "_" + (lotText || "batch") + ".pdf";
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 3000);
-        setPrintStatus("✅ PDF (" + Math.round(pw) + "x" + Math.round(ph) + "pt) — Open and Ctrl+P to print.");
+        setPrintStatus("✅ PDF " + W + "x" + H + " inches — Open and print on Epson.");
       } catch(e) {
         setPrintStatus("❌ Error: " + e.message);
       }
