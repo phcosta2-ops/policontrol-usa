@@ -2151,53 +2151,56 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
   const getVal = (f) => f.id==="lot" ? (lotText||"LOT: ________") : (expText||"EXP: ________");
 
   const [printStatus, setPrintStatus] = useState("");
-  const handlePrint = () => {
+  const handlePrint = async () => {
     const bgImg = tpl?.imageData || null;
     if (!bgImg) { setPrintStatus("❌ No template uploaded"); return; }
-    if (bgImg.startsWith("data:application/pdf")) { setPrintStatus("❌ Template is PDF — please re-upload as image (PNG/JPG)"); return; }
-    setPrintStatus("⏳ Generating label...");
-    const W = labelSize.w, H = labelSize.h;
-    const DPI = 300;
-    const Wpx = Math.round(W * DPI), Hpx = Math.round(H * DPI);
-
+    setPrintStatus("⏳ Generating PDF...");
     try {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onerror = () => setPrintStatus("❌ Failed to load template image");
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = Wpx; canvas.height = Hpx;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, Wpx, Hpx);
+      // Load jsPDF
+      if (!window.jspdf) {
+        await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+      }
+      const { jsPDF } = window.jspdf;
+      const W = labelSize.w, H = labelSize.h;
 
-          overlayFields.forEach(f => {
-            const val = f.id==="lot" ? (lotText?"LOT: "+lotText:"") : (expText?"EXP: "+expText:"");
-            if (!val) return;
-            const x = (f.x / 100) * Wpx;
-            const y = (f.y / 100) * Hpx;
-            const fontSize = Math.round(f.fontSize * (DPI / 72));
-            ctx.font = (f.fontWeight==="bold"?"bold ":"") + fontSize + "px Arial";
-            ctx.fillStyle = f.color;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(val, x, y);
-          });
-
-          const dataUrl = canvas.toDataURL("image/png");
-          const a = document.createElement("a");
-          a.href = dataUrl;
-          a.download = "label_" + p.brand + "_" + (lotText||"batch") + ".png";
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setPrintStatus("✅ PNG downloaded! Open it and press Ctrl+P to print.");
-          aLog("Label PNG", p.brand + " " + (lotText||"") + " " + size);
-        } catch(e) {
-          setPrintStatus("❌ Canvas error: " + e.message);
+      // If PDF template, convert to image first
+      let imgData = bgImg;
+      if (bgImg.startsWith("data:application/pdf")) {
+        setPrintStatus("⏳ Converting PDF template...");
+        if (!window.pdfjsLib) {
+          await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
         }
-      };
-      img.src = bgImg;
+        const raw = atob(bgImg.split(",")[1]);
+        const arr = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+        const pdf = await window.pdfjsLib.getDocument({data: arr}).promise;
+        const page = await pdf.getPage(1);
+        const vp = page.getViewport({scale: 4});
+        const cv = document.createElement("canvas");
+        cv.width = vp.width; cv.height = vp.height;
+        await page.render({canvasContext: cv.getContext("2d"), viewport: vp}).promise;
+        imgData = cv.toDataURL("image/png", 0.95);
+        setPrintStatus("⏳ Building PDF...");
+      }
+
+      // Create PDF with exact label size
+      const doc = new jsPDF({ orientation: W > H ? "l" : "p", unit: "in", format: [W, H] });
+      for (let i = 0; i < qty; i++) {
+        if (i > 0) doc.addPage([W, H], W > H ? "l" : "p");
+        doc.addImage(imgData, "PNG", 0, 0, W, H);
+        overlayFields.forEach(f => {
+          const val = f.id === "lot" ? (lotText ? "LOT: " + lotText : "") : (expText ? "EXP: " + expText : "");
+          if (!val) return;
+          doc.setFontSize(f.fontSize);
+          doc.setFont("helvetica", f.fontWeight === "bold" ? "bold" : "normal");
+          doc.setTextColor(0);
+          doc.text(val, (f.x / 100) * W, (f.y / 100) * H, { align: "center" });
+        });
+      }
+      doc.save("label_" + p.brand + "_" + (lotText || "batch") + ".pdf");
+      setPrintStatus("✅ PDF downloaded! Open and Ctrl+P to print.");
+      aLog("Label PDF", p.brand + " " + (lotText || "") + " " + qty + "x " + size);
     } catch(e) {
       setPrintStatus("❌ Error: " + e.message);
     }
@@ -2320,7 +2323,7 @@ function LabelPrintPanel({ product, S, sv, aLog }) {
                   {(S.lots||[]).filter(l=>l.productId===p.id).map(l=><option key={l.id} value={l.id}>{l.lotNumber}</option>)}
                 </select>
                 <button onClick={handlePrint} disabled={!hasTemplate} style={{...sb_,padding:"10px 24px",fontSize:14,opacity:hasTemplate?1:0.4}}>
-                  🖨️ Download Label PNG
+                  🖨️ Download Label PDF
                 </button>
                 {printStatus && <div style={{fontSize:12,marginTop:6,color:printStatus.startsWith("✅")?K.ok:printStatus.startsWith("❌")?K.er:K.txM}}>{printStatus}</div>}
               </div>
