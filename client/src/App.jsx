@@ -30,8 +30,8 @@ const DEF_COMPONENTS = {
   "pow-cl": {
     name: "Free Chlorine Kit - Powder", type: "Free Chlorine", format: "Powder", category: "dpd-reagents",
     items: [
-      { id: "fc-indicator", name: "DPD Indicator", icon: "🟤", desc: "DPD Sulfate + EDTA mix (49 bottles × 3.48g)" },
-      { id: "fc-buffer", name: "Buffer Powder", icon: "🔵", desc: "Phosphate buffer (49 bottles × 102g)" },
+      { id: "fc-indicator", name: "DPD Indicator", icon: "🟤", desc: "DPD Sulfate + EDTA mix (3.17g/bottle ±2%)" },
+      { id: "fc-buffer", name: "Buffer Powder", icon: "🔵", desc: "Phosphate buffer (93.0g/bottle ±2%)" },
     ]
   },
   "pow-ct": {
@@ -199,47 +199,45 @@ const PRE_INSTR = {
 
   /* ───── FREE CHLORINE POWDER (pow-cl components) ───── */
   "fc-buffer": [
-    { title:"1. Materials & Equipment Needed", description:"BUFFER for Free Chlorine Powder Kit — CL-17 Online Analyzers\n\nEQUIPMENT:\n⚖️ Semi-Analytical Balance (±0.01g, 5000g capacity) → Main Blue Bench\n🌀 V-Shape Mill → Main Blue Bench\n🥛 5-quart container\n🥄 Spatula → Materials Cabinet 1 / Shelf 2\n📋 Production Log → Office Cabinet\n\nRAW MATERIALS (for 49 kits):\n🧪 Na2HPO4 (Anhydrous Sodium Phosphate PA ACS) — 980.4 g\n🧪 KH2PO4 (Monopotassium Phosphate PA ACS) — 3,921.6 g\n🧪 Disodium EDTA PA ACS — 98 g\n\nPPE:\n🧤 Thin Rubber Gloves, 🥽 Safety Glasses, 🥼 Lab Apron, 🥾 Safety Footwear", warning:"PUT ON ALL PPE! Salts must be ANHYDROUS.", notes:"Produces 49 bottles × 102 g. Expiration: 60 months.", observations:"", images:[] },
+    { title:"1. Materials & Equipment Needed", description:"BUFFER for Free Chlorine Powder Kit — CL-17 Online Analyzers (456 mL Kit)\n\nEQUIPMENT:\n⚖️ Semi-Analytical Balance (±0.01g, 5000g capacity) → Main Blue Bench\n🌀 V-Shape Mill → Main Blue Bench\n🥛 5-quart container\n🥄 Spatula → Materials Cabinet 1 / Shelf 2\n📋 Production Log → Office Cabinet\n\nRAW MATERIALS (for batch):\n🧪 Na2HPO4 (Anhydrous Sodium Phosphate PA ACS) — 980.4 g\n🧪 KH2PO4 (Monopotassium Phosphate PA ACS) — 3,921.6 g\n🧪 Disodium EDTA PA ACS — 98 g\n\nPPE:\n🧤 Thin Rubber Gloves, 🥽 Safety Glasses, 🥼 Lab Apron, 🥾 Safety Footwear", warning:"PUT ON ALL PPE! Salts must be ANHYDROUS.", notes:"Bottle weight: 93.0g ±2% (range: 91.14g – 94.86g). Expiration: 60 months.", observations:"", images:[] },
     { title:"2. Weigh Na2HPO4 (980.4 g)", description:"In the 5-quart container, weigh exactly 980.4 g of Anhydrous Sodium Phosphate PA ACS.\n\nTare the container first.", warning:"", notes:"", observations:"", images:[] },
     { title:"3. Weigh KH2PO4 (3,921.6 g)", description:"In the SAME container, add 3,921.6 g of Monopotassium Phosphate PA ACS.", warning:"Largest ingredient — verify scale capacity.", notes:"", observations:"", images:[] },
     { title:"4. Weigh Disodium EDTA (98 g)", description:"Weigh 98 g of Disodium EDTA PA ACS. Reserve separately.", warning:"", notes:"", observations:"", images:[] },
-    { title:"5. V-Shape Mill — 1 Hour", description:"Transfer ALL salts to the V-Shape Mill.\n\n1. Close the Mill\n2. Press RED button on the back\n3. Set rotation (\"rotação\") to 1 hour\n4. Press START (\"Iniciar\")\n5. Run for full hour\n6. Transfer blended powder to clean container", warning:"Mill must be CLEAN and DRY. Verify lid sealed.", notes:"Total: ~5,000 g → 49 bottles × 102 g", observations:"", images:[] },
+    { title:"5. V-Shape Mill — 1 Hour", description:"Transfer ALL salts to the V-Shape Mill.\n\n1. Close the Mill\n2. Press RED button on the back\n3. Set rotation (\"rotação\") to 1 hour\n4. Press START (\"Iniciar\")\n5. Run for full hour\n6. Transfer blended powder to clean container", warning:"Mill must be CLEAN and DRY. Verify lid sealed.", notes:"Total: ~5,000 g → 93.0g/bottle ±2%", observations:"", images:[] },
     { title:"6. Document", description:"Fill out Production Log with all materials, lots, operator, date.\nForward to QC.", warning:"", notes:"", observations:"", images:[] },
   ],
 
   "fc-indicator": [
-    { title:"1. Materials & Equipment Needed", description:"DPD INDICATOR for Free Chlorine Powder Kit\n\nEQUIPMENT:\n⚖️ Balance (±0.01g) → Main Blue Bench\n🥛 Plastic container with cap\n⚪ Ceramic spheres (min 3)\n\nRAW MATERIALS (for 49 kits):\n🟤 DPD Sulfate — 161.8 g\n🧪 Disodium EDTA — 8.82 g\n\nPPE: Gloves, Glasses, Apron, Safety Footwear", warning:"PUT ON ALL PPE!", notes:"Produces 49 bottles × 3.48 g. Expiration: 60 months.", observations:"", images:[] },
+    { title:"1. Materials & Equipment Needed", description:"DPD INDICATOR for Free Chlorine Powder Kit\n\nEQUIPMENT:\n⚖️ Balance (±0.01g) → Main Blue Bench\n🥛 Plastic container with cap\n⚪ Ceramic spheres (min 3)\n\nRAW MATERIALS (for 49 kits):\n🟤 DPD Sulfate — 161.8 g\n🧪 Disodium EDTA — 8.82 g\n\nPPE: Gloves, Glasses, Apron, Safety Footwear", warning:"PUT ON ALL PPE!", notes:"Bottle weight: 3.17g ±2% (range: 3.107g – 3.233g). Expiration: 60 months.", observations:"", images:[] },
     { title:"2. Weigh DPD Sulfate (161.8 g)", description:"Weigh 161.8 g of DPD Sulfate in a plastic container with cap.", warning:"DPD is light-sensitive — keep covered.", notes:"", observations:"", images:[] },
     { title:"3. Add EDTA (8.82 g)", description:"Add 8.82 g of Disodium EDTA (analytical grade) to the SAME container.", warning:"", notes:"", observations:"", images:[] },
-    { title:"4. Add Spheres & Shake (5 min)", description:"Add at least 3 ceramic spheres.\nCap the container.\nShake vigorously for at least 5 MINUTES.\n\nVerify uniform mixture.", warning:"Cap must be secure before shaking!", notes:"Total: 170.62 g → 49 bottles × 3.48 g", observations:"", images:[] },
+    { title:"4. Add Spheres & Shake (5 min)", description:"Add at least 3 ceramic spheres.\nCap the container.\nShake vigorously for at least 5 MINUTES.\n\nVerify uniform mixture.", warning:"Cap must be secure before shaking!", notes:"Total: 170.62 g → 3.17g/bottle ±2%", observations:"", images:[] },
     { title:"5. Document", description:"Fill out Production Log. Forward to QC.", warning:"", notes:"", observations:"", images:[] },
   ],
 
   "fc-bottling": [
     { title:"1. QC Approval Required", description:"Confirm QC has APPROVED this lot before bottling.", warning:"⛔ DO NOT BOTTLE without QC approval!", notes:"", observations:"", images:[] },
-    { title:"2. Buffer Bottling (102 g)", description:"Using funnel in 500 mL flask:\na) Weigh 102 g of buffer powder\nb) Transfer to bottle, cap tightly\nc) Label (expiration: 60 months)\nd) Place in Dark Ziplock Bag", warning:"Verify weight: 102 g per bottle.", notes:"49 bottles total.", observations:"", images:[] },
-    { title:"3. DPD Indicator Bottling (3.48 g)", description:"Using funnel in 500 mL flask:\na) Weigh 3.48 g of DPD indicator powder\nb) Transfer to bottle, cap tightly\nc) Label (expiration: 60 months)\nd) Place in Dark Ziplock Bag", warning:"DPD is light-sensitive.", notes:"49 bottles total.", observations:"", images:[] },
+    { title:"2. Buffer Bottling (93.0 g)", description:"Using funnel in 500 mL flask:\na) Weigh 93.0 g of buffer powder\nb) Transfer to bottle, cap tightly\nc) Label (expiration: 60 months)\nd) Place in Dark Ziplock Bag", warning:"Verify weight: 93.0g ±2% (91.14g – 94.86g).", notes:"49 bottles total.", observations:"", images:[] },
+    { title:"3. DPD Indicator Bottling (3.17 g)", description:"Using funnel in 500 mL flask:\na) Weigh 3.17 g of DPD indicator powder\nb) Transfer to bottle, cap tightly\nc) Label (expiration: 60 months)\nd) Place in Dark Ziplock Bag", warning:"DPD is light-sensitive. Weight: 3.17g ±2% (3.107g – 3.233g).", notes:"", observations:"", images:[] },
     { title:"4. Label Printing (Zebra)", description:"Start PC connected to Zebra Printer (password: Policontrol515)\n\n1. Open File Explorer\n2. Open the Word file for the desired label\n3. Edit LOT, EXP fields\n4. File → Print → Zdesigner (Zebra thermos printer)\n5. Choose quantity → PRINT\n\nApply labels to bottles.", warning:"Verify correct label orientation.", notes:"Or use app Label Printing (🖨️) for Epson CW-C4000.", observations:"", images:[] },
-    { title:"5. Kit Assembly", description:"Assemble each kit:\n• 1 Buffer bottle (102 g) in dark ziplock\n• 1 DPD Indicator bottle (3.48 g) in dark ziplock\n\nPlace in finished goods area.\nComplete FORM PQ 001.", warning:"", notes:"Store cool, dry, light-protected.", observations:"", images:[] },
+    { title:"5. Kit Assembly", description:"Assemble each kit:\n• 1 Buffer bottle (93.0 g) in dark ziplock\n• 1 DPD Indicator bottle (3.17 g) in dark ziplock\n\nPlace in finished goods area.\nComplete FORM PQ 001.", warning:"", notes:"Store cool, dry, light-protected.", observations:"", images:[] },
   ],
 
 };
 
 /* ── RAW MATERIALS & BOM ── */
 const DEF_RAW = [
-  { id:"rm-001", code:"RM-001", name:"Sulfuric Acid (Analytical Grade)", unit:"mL", minStock:200, vendor:"Sigma", entries:[] },
-  { id:"rm-002", code:"RM-002", name:"DPD Sulfate P.A", unit:"g", minStock:1500, vendor:"Sigma", entries:[] },
-  { id:"rm-003", code:"RM-003", name:"Boric Acid", unit:"g", minStock:1000, vendor:"Sigma/Synth", entries:[] },
-  { id:"rm-004", code:"RM-004", name:"Disodium EDTA P.A", unit:"g", minStock:500, vendor:"Sigma/Synth/Cromato/Neon", entries:[] },
-  { id:"rm-005", code:"RM-005", name:"KH2PO4 (Monopotassium Phosphate P.A ACS)", unit:"g", minStock:5000, vendor:"Sigma/Synth/Cromato/Neon", entries:[] },
+  { id:"rm-001", code:"RM-001", name:"Sulfuric Acid (Analytical Grade)", unit:"mL", minStock:200, vendor:"Sigma", entries:[{id:"e-init-001",lotNumber:"INIT",quantity:500,remaining:500,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-002", code:"RM-002", name:"DPD Sulfate P.A", unit:"g", minStock:1500, vendor:"Sigma", entries:[{id:"e-init-002",lotNumber:"INIT",quantity:700,remaining:700,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-003", code:"RM-003", name:"Boric Acid", unit:"g", minStock:1000, vendor:"Sigma/Synth", entries:[{id:"e-init-003",lotNumber:"INIT",quantity:4000,remaining:4000,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-004", code:"RM-004", name:"Disodium EDTA P.A", unit:"g", minStock:500, vendor:"Sigma/Synth/Cromato/Neon", entries:[{id:"e-init-004",lotNumber:"INIT",quantity:2000,remaining:2000,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-005", code:"RM-005", name:"KH2PO4 (Monopotassium Phosphate P.A ACS)", unit:"g", minStock:5000, vendor:"Sigma/Synth/Cromato/Neon", entries:[{id:"e-init-005",lotNumber:"INIT",quantity:40000,remaining:40000,purchaseDate:"2026-04-20",expirationDate:""}] },
   { id:"rm-006", code:"RM-006", name:"Na2HPO4 (Anhydrous Sodium Phosphate P.A ACS)", unit:"g", minStock:3000, vendor:"Sigma/Synth/Cromato", entries:[] },
-  { id:"rm-007", code:"RM-007", name:"Bottles 500mL (16oz)", unit:"pcs", minStock:200, vendor:"", entries:[] },
-  { id:"rm-008", code:"RM-008", name:"Dark Ziplock Bag", unit:"pcs", minStock:100, vendor:"", entries:[] },
-  { id:"rm-009", code:"RM-009", name:"Labels (Printed)", unit:"pcs", minStock:200, vendor:"", entries:[] },
-  { id:"rm-010", code:"RM-010", name:"DI Water (Type I Ultrapure)", unit:"mL", minStock:50000, vendor:"", entries:[] },
+  { id:"rm-007", code:"RM-007", name:"Round Bottles 500mL (16oz)", unit:"pcs", minStock:200, vendor:"", entries:[{id:"e-init-007",lotNumber:"INIT",quantity:500,remaining:500,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-010", code:"RM-010", name:"DI Water (Type I Ultrapure)", unit:"mL", minStock:50000, vendor:"", entries:[{id:"e-init-010",lotNumber:"INIT",quantity:20000,remaining:20000,purchaseDate:"2026-04-20",expirationDate:""}] },
   { id:"rm-011", code:"RM-011", name:"Ceramic Spheres", unit:"pcs", minStock:20, vendor:"", entries:[] },
   { id:"rm-012", code:"RM-012", name:"PVC Film Roll", unit:"pcs", minStock:10, vendor:"", entries:[] },
-  { id:"rm-013", code:"RM-013", name:"Potassium Iodide P.A (KI)", unit:"g", minStock:500, vendor:"Synth", entries:[] },
+  { id:"rm-013", code:"RM-013", name:"Potassium Iodide P.A (KI)", unit:"g", minStock:500, vendor:"Synth", entries:[{id:"e-init-013",lotNumber:"INIT",quantity:2000,remaining:2000,purchaseDate:"2026-04-20",expirationDate:""}] },
   { id:"rm-014", code:"RM-014", name:"Hach Powder Pillows (Free Chlorine DPD 10mL)", unit:"pcs", minStock:50, vendor:"Hach", entries:[] },
   { id:"rm-015", code:"RM-015", name:"Chlorine Standard 1000 mg/L (ISOGUIDE)", unit:"mL", minStock:500, vendor:"ISOGUIDE", entries:[] },
   { id:"rm-016", code:"RM-016", name:"pH Buffer Solution 4.0", unit:"mL", minStock:500, vendor:"", entries:[] },
@@ -247,6 +245,12 @@ const DEF_RAW = [
   { id:"rm-018", code:"RM-018", name:"pH Buffer Solution 10.0", unit:"mL", minStock:500, vendor:"", entries:[] },
   { id:"rm-019", code:"RM-019", name:"Dropper Bottles (60mL)", unit:"pcs", minStock:100, vendor:"", entries:[] },
   { id:"rm-020", code:"RM-020", name:"Plastic Container with Cap (for DPD mixing)", unit:"pcs", minStock:20, vendor:"", entries:[] },
+  { id:"rm-021", code:"RM-021", name:"Square Bottles 500mL (16oz)", unit:"pcs", minStock:100, vendor:"", entries:[{id:"e-init-021",lotNumber:"INIT",quantity:344,remaining:344,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-022", code:"RM-022", name:"Lid for Square Bottle 16oz", unit:"pcs", minStock:100, vendor:"", entries:[{id:"e-init-022",lotNumber:"INIT",quantity:344,remaining:344,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-023", code:"RM-023", name:"Lid for Round Bottle 16oz", unit:"pcs", minStock:100, vendor:"", entries:[{id:"e-init-023",lotNumber:"INIT",quantity:50,remaining:50,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-024", code:"RM-024", name:"Aluminum Zip Bag 10x10", unit:"pcs", minStock:100, vendor:"", entries:[] },
+  { id:"rm-025", code:"RM-025", name:"2/2.25 Labels Roll", unit:"pcs", minStock:2, vendor:"", entries:[{id:"e-init-025",lotNumber:"INIT",quantity:2,remaining:2,purchaseDate:"2026-04-20",expirationDate:""}] },
+  { id:"rm-026", code:"RM-026", name:"4x3 Label Roll", unit:"pcs", minStock:2, vendor:"", entries:[] },
 ];
 
 const DEF_QC = {
@@ -309,7 +313,7 @@ DEF_BOM["pow-ct-pol"] = DEF_BOM["pow-ct-ultra"];
 
 // ── FREE CHLORINE POWDER BOM (per kit out of 49-kit batch) ──
 // Buffer: 980.4g Na2HPO4 + 3921.6g KH2PO4 + 98g EDTA → 49 bottles × 102g
-// Indicator: 161.8g DPD + 8.82g EDTA → 49 bottles × 3.48g
+// Indicator: 161.8g DPD + 8.82g EDTA → 3.17g/bottle
 DEF_BOM["pow-cl-ultra"] = [
   {rawMaterialId:"rm-002", qtyPerUnit:3.3,   component:"DPD Indicator (161.8g/49)"},
   {rawMaterialId:"rm-004", qtyPerUnit:2.18,  component:"Indicator + Buffer (EDTA)"},
@@ -540,6 +544,12 @@ function MainApp({ user, onLogout }) {
         { id:"rm-018", code:"RM-018", name:"pH Buffer Solution 10.0", unit:"mL", minStock:500, vendor:"", entries:[] },
         { id:"rm-019", code:"RM-019", name:"Dropper Bottles (60mL)", unit:"pcs", minStock:100, vendor:"", entries:[] },
         { id:"rm-020", code:"RM-020", name:"Plastic Container with Cap (for DPD mixing)", unit:"pcs", minStock:20, vendor:"", entries:[] },
+        { id:"rm-021", code:"RM-021", name:"Square Bottles 500mL (16oz)", unit:"pcs", minStock:100, vendor:"", entries:[] },
+        { id:"rm-022", code:"RM-022", name:"Lid for Square Bottle 16oz", unit:"pcs", minStock:100, vendor:"", entries:[] },
+        { id:"rm-023", code:"RM-023", name:"Lid for Round Bottle 16oz", unit:"pcs", minStock:100, vendor:"", entries:[] },
+        { id:"rm-024", code:"RM-024", name:"Aluminum Zip Bag 10x10", unit:"pcs", minStock:100, vendor:"", entries:[] },
+        { id:"rm-025", code:"RM-025", name:"2/2.25 Labels Roll", unit:"pcs", minStock:2, vendor:"", entries:[] },
+        { id:"rm-026", code:"RM-026", name:"4x3 Label Roll", unit:"pcs", minStock:2, vendor:"", entries:[] },
       ];
       for (const nm of newMats) {
         if (!(s.rawMaterials||[]).find(r => r.id === nm.id)) s.rawMaterials = [...s.rawMaterials, nm];
