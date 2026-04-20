@@ -2398,6 +2398,104 @@ function AuditView({ log }) {
   return (<PW title="History">{!(log||[]).length?<div style={{textAlign:"center",padding:40,color:K.txD}}>No changes</div>:log.map((e,i)=><div key={i} style={{background:K.cd,borderRadius:10,padding:"10px 14px",border:`1px solid ${K.bd}`,marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,color:K.tx}}><strong>{e.user}</strong> — {e.action}</div><div style={{fontSize:12,color:K.txM}}>{e.details}</div></div><div style={{fontSize:11,color:K.txD,whiteSpace:"nowrap",marginLeft:16}}>{new Date(e.ts).toLocaleString("en-US")}</div></div>)}</PW>);
 }
 
+/* ── Backup / Restore ── */
+function BackupPanel({ S, setS, aLog }) {
+  const [status, setStatus] = useState("");
+  const fileRef = useRef(null);
+
+  const doExport = () => {
+    try {
+      const data = { ...S, _exportDate: new Date().toISOString(), _version: "policontrol-backup-v1" };
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "policontrol_backup_" + new Date().toISOString().slice(0,10) + ".json";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      setStatus("✅ Backup exported! Keep this file safe.");
+      aLog("Backup exported", new Date().toISOString());
+    } catch(e) {
+      setStatus("❌ Export failed: " + e.message);
+    }
+  };
+
+  const doImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setStatus("⏳ Importing...");
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data._version && !data.products) { setStatus("❌ Invalid backup file."); return; }
+        // Remove internal fields
+        delete data._exportDate; delete data._version; delete data._ver;
+        await setS(data);
+        setStatus("✅ Backup restored! All data imported. Refresh the page to see changes.");
+        aLog("Backup imported", new Date().toISOString());
+      } catch(err) {
+        setStatus("❌ Import failed: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const prodCount = (S.products||[]).length;
+  const matCount = (S.rawMaterials||[]).length;
+  const lotCount = (S.lots||[]).length;
+  const instrCount = Object.keys(S.instructions||{}).length;
+  const tplCount = Object.keys(S.labelTemplates||{}).length;
+
+  return (
+    <div>
+      <div style={{fontSize:15,fontWeight:700,color:K.tx,marginBottom:6}}>💾 Backup & Restore</div>
+      <div style={{fontSize:13,color:K.txM,marginBottom:20}}>Export all data before updating the app. Import to restore after deploy.</div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+        {/* Export */}
+        <div style={{background:K.cd,borderRadius:12,border:`1px solid ${K.ok}44`,padding:20}}>
+          <div style={{fontSize:16,marginBottom:6}}>📤</div>
+          <div style={{fontSize:14,fontWeight:700,color:K.tx,marginBottom:4}}>Export Backup</div>
+          <div style={{fontSize:12,color:K.txM,marginBottom:12}}>Download all data as JSON file</div>
+          <div style={{fontSize:11,color:K.txM,marginBottom:12,lineHeight:1.6}}>
+            Includes: {prodCount} products, {matCount} materials, {lotCount} lots, {instrCount} instructions, {tplCount} label templates, photos, QC results, audit log
+          </div>
+          <button onClick={doExport} style={{...sb_,width:"100%",padding:"12px",fontSize:14}}>📤 Export All Data</button>
+        </div>
+
+        {/* Import */}
+        <div style={{background:K.cd,borderRadius:12,border:`1px solid ${K.wr}44`,padding:20}}>
+          <div style={{fontSize:16,marginBottom:6}}>📥</div>
+          <div style={{fontSize:14,fontWeight:700,color:K.tx,marginBottom:4}}>Import Backup</div>
+          <div style={{fontSize:12,color:K.txM,marginBottom:12}}>Restore from a backup JSON file</div>
+          <div style={{fontSize:11,color:K.er,marginBottom:12,lineHeight:1.6}}>
+            ⚠️ This will OVERWRITE all current data with the backup file contents.
+          </div>
+          <button onClick={()=>fileRef.current?.click()} style={{...so_,width:"100%",padding:"12px",fontSize:14,borderColor:K.wr}}>📥 Import Backup File</button>
+          <input ref={fileRef} type="file" accept=".json" onChange={doImport} style={{display:"none"}} />
+        </div>
+      </div>
+
+      {status && <div style={{padding:"12px 16px",borderRadius:10,fontSize:13,fontWeight:600,
+        background:status.startsWith("✅")?"#dcfce7":status.startsWith("❌")?"#fef2f2":"#fef3c7",
+        color:status.startsWith("✅")?"#166534":status.startsWith("❌")?"#991b1b":"#92400e",
+        marginBottom:16}}>{status}</div>}
+
+      <div style={{background:K.hv,borderRadius:10,padding:16,fontSize:12,color:K.txM,lineHeight:1.6}}>
+        <strong>💡 Workflow before updating the app:</strong><br/>
+        1. Click <strong>📤 Export All Data</strong> — saves JSON file to Downloads<br/>
+        2. Do the GitHub push (update App.jsx)<br/>
+        3. Wait for Render to rebuild<br/>
+        4. Open app → Settings → Backup → <strong>📥 Import Backup File</strong><br/>
+        5. Select the JSON file → all data restored!
+      </div>
+    </div>
+  );
+}
+
 /* ── AI Import (paste IT document → auto-create kit/product/instructions) ── */
 function AIImport({ S, sv, aLog, allCats, allKits, allBrands }) {
   const [input, setInput] = useState("");
@@ -2637,7 +2735,7 @@ function SettingsView({ S, sv, aLog }) {
     <PW title="Settings" sub="Manage products, categories, brands, and kit types">
       {/* Tabs */}
       <div style={{display:"flex",gap:4,marginBottom:20}}>
-        {[["products","📋 Products"],["categories","🏷️ Categories"],["brands","🏢 Brands"],["kits","🧪 Kit Types"],["ai","🤖 AI Import"]].map(([id,lbl])=>(
+        {[["products","📋 Products"],["categories","🏷️ Categories"],["brands","🏢 Brands"],["kits","🧪 Kit Types"],["ai","🤖 AI Import"],["backup","💾 Backup"]].map(([id,lbl])=>(
           <button key={id} onClick={()=>setTab(id)} style={{...so_,background:tab===id?K.hv:"transparent",color:tab===id?K.pri:K.txM,borderColor:tab===id?K.pri:K.bd,fontSize:13,padding:"8px 16px",fontWeight:tab===id?600:400}}>{lbl}</button>
         ))}
       </div>
@@ -2795,6 +2893,9 @@ function SettingsView({ S, sv, aLog }) {
 
       {/* ── AI IMPORT ── */}
       {tab==="ai" && <AIImport S={S} sv={sv} aLog={aLog} allCats={allCats} allKits={allKits} allBrands={allBrands} />}
+
+      {/* ── BACKUP ── */}
+      {tab==="backup" && <BackupPanel S={S} setS={async(data)=>{for(const[k,v]of Object.entries(data)){await sv(k,v)}}} aLog={aLog} />}
     </PW>
   );
 }
